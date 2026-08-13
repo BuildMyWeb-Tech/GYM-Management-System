@@ -1,17 +1,8 @@
 // components/store/StoreSidebar.jsx
 'use client';
 import { usePathname, useRouter } from 'next/navigation';
-import {
-  HomeIcon,
-  LayoutListIcon,
-  BarChart2,
-  ShoppingBag,
-  Settings,
-  X,
-  ChevronRight,
-  ChevronLeft,
-  Users,
-} from 'lucide-react';
+import { HomeIcon, LayoutListIcon, BarChart2, ShoppingBag, Settings, X, ChevronRight, ChevronLeft, Users, UserCog } from 'lucide-react';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -19,6 +10,7 @@ import { PERMISSIONS } from '@/middlewares/authEmployee';
 
 const ALL_LINKS = [
   { name: 'Dashboard', href: '/store', icon: HomeIcon, permission: null },
+  { name: 'Members', href: '/store/members', icon: Users, permission: PERMISSIONS.MANAGE_MEMBERS },
   {
     name: 'Plan Categories',
     href: '/store/categories',
@@ -40,7 +32,7 @@ const ALL_LINKS = [
   {
     name: 'Receptionists',
     href: '/store/employees',
-    icon: Users,
+    icon: UserCog,
     permission: null,
     ownerOnly: true,
   },
