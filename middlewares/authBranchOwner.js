@@ -1,12 +1,11 @@
-// C:\Users\Siddharathan\Desktop\gocart-ecommerce-full-stack\middlewares\authSeller.js
 import prisma from '@/lib/prisma';
 
 /**
- * Verifies userId owns an ACTIVE store.
- * Returns storeId string | null.
+ * Verifies userId owns an ACTIVE branch.
+ * Returns branchId string | null.
  * Throws on DB error so callers can return 500 instead of silent 401.
  */
-const authSeller = async (userId) => {
+const authBranchOwner = async (userId) => {
   if (!userId) return null;
 
   try {
@@ -14,7 +13,7 @@ const authSeller = async (userId) => {
       where: { id: userId },
       select: {
         id: true,
-        store: {
+        branch: {
           select: {
             id: true,
             status: true,
@@ -24,16 +23,16 @@ const authSeller = async (userId) => {
       },
     });
 
-    if (!user || !user.store) return null;
+    if (!user || !user.branch) return null;
 
     // Must be ACTIVE status (set by admin after approval)
-    if (user.store.status !== 'ACTIVE' || !user.store.isActive) return null;
+    if (user.branch.status !== 'ACTIVE' || !user.branch.isActive) return null;
 
-    return user.store.id;
+    return user.branch.id;
   } catch (error) {
-    console.error('authSeller DB error:', error);
-    throw new Error('DB_ERROR_AUTH_SELLER');
+    console.error('authBranchOwner DB error:', error);
+    throw new Error('DB_ERROR_AUTH_BRANCH_OWNER');
   }
 };
 
-export default authSeller;
+export default authBranchOwner;

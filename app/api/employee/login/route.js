@@ -14,42 +14,44 @@ export async function POST(request) {
     const employee = await prisma.employee.findUnique({
       where: { email },
       include: {
-        store: {
+        branch: {
           select: { id: true, name: true, logo: true, status: true, isActive: true },
         },
       },
     });
 
-    if (!employee)
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    if (!employee) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
 
     if (!employee.isActive)
-      return NextResponse.json({ error: 'Your account has been deactivated. Contact your store owner.' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Your account has been deactivated. Contact your branch owner.' },
+        { status: 403 }
+      );
 
-    // ✅ Uppercase enum check
-    const store = employee.store;
-    if (!store)
-      return NextResponse.json({ error: 'Store not found.' }, { status: 404 });
+    const branch = employee.branch;
+    if (!branch) return NextResponse.json({ error: 'Branch not found.' }, { status: 404 });
 
-    if (store.status === 'PENDING')
-      return NextResponse.json({ error: 'Store is waiting for admin approval.' }, { status: 403 });
-    if (store.status === 'REJECTED')
-      return NextResponse.json({ error: 'Store has been rejected. Contact admin.' }, { status: 403 });
-    if (store.status === 'INACTIVE' || !store.isActive)
-      return NextResponse.json({ error: 'Store is currently inactive.' }, { status: 403 });
-    if (store.status !== 'ACTIVE')
-      return NextResponse.json({ error: 'Store is not active yet.' }, { status: 403 });
+    if (branch.status === 'PENDING')
+      return NextResponse.json({ error: 'Branch is waiting for admin approval.' }, { status: 403 });
+    if (branch.status === 'REJECTED')
+      return NextResponse.json(
+        { error: 'Branch has been rejected. Contact admin.' },
+        { status: 403 }
+      );
+    if (branch.status === 'INACTIVE' || !branch.isActive)
+      return NextResponse.json({ error: 'Branch is currently inactive.' }, { status: 403 });
+    if (branch.status !== 'ACTIVE')
+      return NextResponse.json({ error: 'Branch is not active yet.' }, { status: 403 });
 
     const isValid = await bcrypt.compare(password, employee.password);
-    if (!isValid)
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    if (!isValid) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
 
     const token = jwt.sign(
       {
-        employeeId:  employee.id,
-        storeId:     employee.storeId,
-        name:        employee.name,
-        email:       employee.email,
+        employeeId: employee.id,
+        branchId: employee.branchId,
+        name: employee.name,
+        email: employee.email,
         permissions: employee.permissions,
       },
       JWT_SECRET_KEY,
@@ -59,9 +61,9 @@ export async function POST(request) {
     const { password: _, ...safeEmployee } = employee;
 
     return NextResponse.json({
-      message:  'Login successful',
+      message: 'Login successful',
       token,
-      employee: { ...safeEmployee, store },
+      employee: { ...safeEmployee, branch },
     });
   } catch (error) {
     console.error('POST /api/employee/login error:', error);

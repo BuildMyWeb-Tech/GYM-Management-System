@@ -1,19 +1,15 @@
-// C:\Users\Siddharathan\Desktop\gocart-ecommerce-full-stack\middlewares\authEmployee.js
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'employee_jwt_secret_gocart_2025';
+const JWT_SECRET = process.env.JWT_SECRET || 'employee_jwt_secret_gym_2026';
 
-// ── All valid permission keys (matches checkbox list in store panel) ──────────
+// ── All valid permission keys (matches checkbox list in branch panel) ─────────
 export const PERMISSIONS = {
-  ADD_PRODUCT: 'ADD_PRODUCT',
-  EDIT_PRODUCT: 'EDIT_PRODUCT',
-  DELETE_PRODUCT: 'DELETE_PRODUCT',
-  MANAGE_INVENTORY: 'MANAGE_INVENTORY',
-  VIEW_ORDERS: 'VIEW_ORDERS',
-  UPDATE_ORDER_STATUS: 'UPDATE_ORDER_STATUS',
-  MANAGE_CATEGORIES: 'MANAGE_CATEGORIES',
+  MANAGE_MEMBERS: 'MANAGE_MEMBERS',
+  MARK_ATTENDANCE: 'MARK_ATTENDANCE',
+  COLLECT_PAYMENT: 'COLLECT_PAYMENT',
+  MANAGE_MEMBERSHIPS: 'MANAGE_MEMBERSHIPS',
   VIEW_REPORTS: 'VIEW_REPORTS',
-  MANAGE_STORE_SETTINGS: 'MANAGE_STORE_SETTINGS',
+  MANAGE_BRANCH_SETTINGS: 'MANAGE_BRANCH_SETTINGS',
 };
 
 /**
@@ -23,9 +19,9 @@ export const PERMISSIONS = {
  * Token payload shape:
  * {
  *   employeeId: string,
- *   storeId: string,
+ *   branchId: string,
  *   email: string,
- *   permissions: { ADD_PRODUCT: true, VIEW_ORDERS: false, ... }
+ *   permissions: { MANAGE_MEMBERS: true, MARK_ATTENDANCE: false, ... }
  * }
  */
 export function verifyEmployeeToken(request) {
@@ -34,9 +30,7 @@ export function verifyEmployeeToken(request) {
       ? request.headers.get('authorization') || ''
       : request.headers?.authorization || '';
 
-    const token = authHeader.startsWith('Bearer ')
-      ? authHeader.slice(7).trim()
-      : null;
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
 
     if (!token) return null;
 
@@ -50,25 +44,21 @@ export function verifyEmployeeToken(request) {
 
 /**
  * Checks if employee has a specific permission.
- * Returns true | false.
- *
- * Usage:
- *   hasPermission(employee, PERMISSIONS.ADD_PRODUCT)
+ * Owners signing in via employee route also get full access.
  */
 export function hasPermission(employee, permission) {
   if (!employee) return false;
-  // Owners signing in via employee route also get full access
   if (employee.isOwner === true) return true;
   return employee.permissions?.[permission] === true;
 }
 
 /**
- * Verifies the employee belongs to the expected store.
- * Prevents employees from accessing other stores' APIs.
+ * Verifies the employee belongs to the expected branch.
+ * Prevents employees from accessing other branches' APIs.
  */
-export function belongsToStore(employee, storeId) {
+export function belongsToBranch(employee, branchId) {
   if (!employee) return false;
-  return employee.storeId === storeId;
+  return employee.branchId === branchId;
 }
 
 export const JWT_SECRET_KEY = JWT_SECRET;

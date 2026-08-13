@@ -1,7 +1,7 @@
 'use client'
 import React from 'react'
 import Title from './Title'
-import ProductCard from './ProductCard'
+
 import { useSelector } from 'react-redux'
 
 const About = () => {

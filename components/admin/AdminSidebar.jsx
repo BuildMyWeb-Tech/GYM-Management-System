@@ -4,23 +4,20 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
-  Store,
+  Building2,
   CheckSquare,
   Layers,
   BarChart2,
   ShoppingBag,
-  Package,
-  Settings2,
 } from 'lucide-react';
 
 const navLinks = [
-  { label: 'Dashboard',    href: '/admin',              icon: LayoutDashboard },
-  { label: 'Stores',       href: '/admin/stores',       icon: Store },
-  { label: 'Approve',      href: '/admin/approve',      icon: CheckSquare },
-  { label: 'Categories',   href: '/admin/categories',   icon: Layers },
-  { label: 'Inventory',    href: '/admin/inventory',    icon: Package },
-  { label: 'Orders',       href: '/admin/orders',       icon: ShoppingBag },
-  { label: 'Coupons',      href: '/admin/coupons',      icon: BarChart2 },
+  { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+  { label: 'Branches', href: '/admin/stores', icon: Building2 },
+  { label: 'Approve', href: '/admin/approve', icon: CheckSquare },
+  { label: 'Categories', href: '/admin/categories', icon: Layers },
+  { label: 'Orders', href: '/admin/orders', icon: ShoppingBag },
+  { label: 'Coupons', href: '/admin/coupons', icon: BarChart2 },
   { label: 'Sales Report', href: '/admin/sales-report', icon: BarChart2 },
 ];
 
@@ -36,8 +33,7 @@ export default function AdminSidebar({ setSidebarOpen }) {
       </div>
       <nav className="flex flex-col gap-1">
         {navLinks.map(({ label, href, icon: Icon }) => {
-          const isActive =
-            href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
+          const isActive = href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
           return (
             <Link
               key={href}

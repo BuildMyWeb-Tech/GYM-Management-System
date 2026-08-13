@@ -3,28 +3,25 @@
 import { useEffect, useState } from 'react';
 import Loading from '../Loading';
 import Link from 'next/link';
-import { ArrowRightIcon, ShieldAlert, LogIn } from 'lucide-react';
-import SellerNavbar from './StoreNavbar';
-import SellerSidebar from './StoreSidebar';
+import { ShieldAlert, LogIn } from 'lucide-react';
+import BranchNavbar from './StoreNavbar';
+import BranchSidebar from './StoreSidebar';
 import { useAuth, SignIn } from '@clerk/nextjs';
 import axios from 'axios';
 
 const StoreLayout = ({ children }) => {
   const { getToken, isLoaded, isSignedIn } = useAuth();
 
-  const [isSeller, setIsSeller]             = useState(false);
-  const [loading, setLoading]               = useState(true);
-  const [storeInfo, setStoreInfo]           = useState(null);
+  const [isBranchOwner, setIsBranchOwner] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [branchInfo, setBranchInfo] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [employeeSession, setEmployeeSession] = useState(null);
   const [hasEmployeeToken, setHasEmployeeToken] = useState(false);
 
   const fetchAccess = async () => {
     try {
-      const empToken =
-        typeof window !== 'undefined'
-          ? localStorage.getItem('employeeToken')
-          : null;
+      const empToken = typeof window !== 'undefined' ? localStorage.getItem('employeeToken') : null;
 
       if (empToken) {
         setHasEmployeeToken(true);
@@ -33,10 +30,10 @@ const StoreLayout = ({ children }) => {
             headers: { Authorization: `Bearer ${empToken}` },
           });
 
-          if (data?.valid && data?.store) {
-            setStoreInfo(data.store);
+          if (data?.valid && data?.branch) {
+            setBranchInfo(data.branch);
             setEmployeeSession(data.employee);
-            setIsSeller(true);
+            setIsBranchOwner(true);
             setLoading(false);
             return;
           }
@@ -63,12 +60,12 @@ const StoreLayout = ({ children }) => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      setIsSeller(data.isSeller || false);
-      setStoreInfo(data.storeInfo || data.store || null);
+      setIsBranchOwner(data.isBranchOwner || false);
+      setBranchInfo(data.branch || null);
       setEmployeeSession(null);
     } catch (error) {
       console.error('StoreLayout auth error:', error);
-      setIsSeller(false);
+      setIsBranchOwner(false);
     } finally {
       setLoading(false);
     }
@@ -95,16 +92,18 @@ const StoreLayout = ({ children }) => {
 
   useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? 'hidden' : 'auto';
-    return () => { document.body.style.overflow = 'auto'; };
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
   }, [mobileMenuOpen]);
 
   if (!isLoaded || loading) return <Loading />;
 
-  if (isSeller) {
+  if (isBranchOwner) {
     return (
       <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
-        <SellerNavbar
-          storeInfo={storeInfo}
+        <BranchNavbar
+          branchInfo={branchInfo}
           mobileMenuOpen={mobileMenuOpen}
           setMobileMenuOpen={setMobileMenuOpen}
           employee={employeeSession}
@@ -121,19 +120,18 @@ const StoreLayout = ({ children }) => {
               mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
             } mobile-menu-content`}
           >
-            <SellerSidebar
-              storeInfo={storeInfo}
+            <BranchSidebar
+              branchInfo={branchInfo}
               closeMobileMenu={() => setMobileMenuOpen(false)}
               employee={employeeSession}
             />
           </div>
-          {/* ✅ Removed p-5 / lg:pl-12 / lg:pt-12 and decorative blobs that constrained width */}
           <div className="flex-1 h-full overflow-y-auto hide-scrollbar bg-slate-50 relative">
             <div className="relative z-10">{children}</div>
             <div className="pb-4 text-center text-xs text-slate-400 relative z-10">
               <p>
-                © {new Date().getFullYear()}{' '}
-                {storeInfo?.name || 'Store Dashboard'} • All Rights Reserved
+                © {new Date().getFullYear()} {branchInfo?.name || 'Branch Dashboard'} • All Rights
+                Reserved
               </p>
             </div>
           </div>
@@ -158,14 +156,14 @@ const StoreLayout = ({ children }) => {
         </div>
         <h1 className="text-2xl font-semibold text-slate-800 mb-3">Access Denied</h1>
         <p className="text-slate-500 mb-6 text-sm">
-          You need to be a store owner or employee to access this dashboard.
+          You need to be a branch owner or receptionist to access this dashboard.
         </p>
         <div className="flex flex-col gap-3">
           <Link
             href="/create-store"
             className="bg-gradient-to-r from-green-600 to-green-700 text-white flex items-center justify-center gap-2 py-3 px-6 rounded-lg text-sm font-medium shadow-md hover:from-green-700 hover:to-green-800 transition"
           >
-            <LogIn size={16} /> Store / Employee Login
+            <LogIn size={16} /> Branch / Receptionist Login
           </Link>
         </div>
       </div>

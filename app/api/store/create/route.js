@@ -1,4 +1,4 @@
-// app/api/store/create/route.js
+// app/api/store/create/route.js — creates a Branch (pending admin approval)
 import imagekit from '@/configs/imageKit';
 import prisma from '@/lib/prisma';
 import { clerkClient, getAuth } from '@clerk/nextjs/server';
@@ -19,7 +19,7 @@ async function ensureUserExists(userId) {
   });
 }
 
-// POST /api/store/create — Create a new store (pending approval)
+// POST /api/store/create — Create a new branch (pending approval)
 export async function POST(request) {
   try {
     const { userId } = getAuth(request);
@@ -28,29 +28,41 @@ export async function POST(request) {
     await ensureUserExists(userId);
 
     const formData = await request.formData();
-    const name        = formData.get('name');
+    const name = formData.get('name');
     const description = formData.get('description');
-    const username    = formData.get('username');
-    const address     = formData.get('address');
-    const email       = formData.get('email');
-    const contact     = formData.get('contact');
-    const logoFile    = formData.get('image') || formData.get('logo');
+    const username = formData.get('username');
+    const address = formData.get('address');
+    const phone = formData.get('phone');
+    const email = formData.get('email');
+    const contact = formData.get('contact');
+    const operatingHours = formData.get('operatingHours') || null;
+    const gstNumber = formData.get('gstNumber') || null;
+    const logoFile = formData.get('image') || formData.get('logo');
 
-    if (!name || !description || !username || !address || !email || !contact || !logoFile) {
+    if (
+      !name ||
+      !description ||
+      !username ||
+      !address ||
+      !phone ||
+      !email ||
+      !contact ||
+      !logoFile
+    ) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
     }
 
     // Username validation — lowercase, no spaces
     const cleanUsername = username.toLowerCase().trim().replace(/\s+/g, '-');
 
-    const usernameTaken = await prisma.store.findUnique({ where: { username: cleanUsername } });
+    const usernameTaken = await prisma.branch.findUnique({ where: { username: cleanUsername } });
     if (usernameTaken) {
       return NextResponse.json({ error: 'Username already taken' }, { status: 400 });
     }
 
-    const existingStore = await prisma.store.findUnique({ where: { userId } });
-    if (existingStore) {
-      return NextResponse.json({ error: 'You already have a store' }, { status: 400 });
+    const existingBranch = await prisma.branch.findUnique({ where: { userId } });
+    if (existingBranch) {
+      return NextResponse.json({ error: 'You already have a branch' }, { status: 400 });
     }
 
     // Upload logo to ImageKit
@@ -58,7 +70,7 @@ export async function POST(request) {
     const uploadResponse = await imagekit.upload({
       file: buffer,
       fileName: logoFile.name,
-      folder: 'stores',
+      folder: 'branches',
     });
 
     const logo = imagekit.url({
@@ -66,17 +78,20 @@ export async function POST(request) {
       transformation: [{ quality: 'auto' }, { format: 'webp' }, { width: '256' }],
     });
 
-    // Create store + default commission (0%) in transaction
-    const newStore = await prisma.$transaction(async (tx) => {
-      const store = await tx.store.create({
+    // Create branch + default commission (0%) in transaction
+    const newBranch = await prisma.$transaction(async (tx) => {
+      const branch = await tx.branch.create({
         data: {
           userId,
           name,
           description,
           username: cleanUsername,
           address,
+          phone,
           email,
           contact,
+          operatingHours,
+          gstNumber,
           logo,
           status: 'PENDING',
           isActive: false,
@@ -86,17 +101,17 @@ export async function POST(request) {
       // Default commission: 0%
       await tx.commission.create({
         data: {
-          storeId: store.id,
+          branchId: branch.id,
           percentage: 0,
         },
       });
 
-      return store;
+      return branch;
     });
 
     return NextResponse.json({
-      message: 'Store created successfully. Awaiting admin approval.',
-      store: newStore,
+      message: 'Branch created successfully. Awaiting admin approval.',
+      branch: newBranch,
     });
   } catch (error) {
     console.error('POST /api/store/create error:', error);
@@ -104,20 +119,20 @@ export async function POST(request) {
   }
 }
 
-// GET /api/store/create — Get current user's store status
+// GET /api/store/create — Get current user's branch status
 export async function GET(request) {
   try {
     const { userId } = getAuth(request);
     if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
-    const store = await prisma.store.findUnique({
+    const branch = await prisma.branch.findUnique({
       where: { userId },
       include: { commission: true },
     });
 
-    if (!store) return NextResponse.json({ store: null, status: null });
+    if (!branch) return NextResponse.json({ branch: null, status: null });
 
-    return NextResponse.json({ store, status: store.status });
+    return NextResponse.json({ branch, status: branch.status });
   } catch (error) {
     console.error('GET /api/store/create error:', error);
     return NextResponse.json({ error: error.message }, { status: 400 });

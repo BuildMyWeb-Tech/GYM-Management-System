@@ -8,265 +8,298 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ─── USER ────────────────────────────────────────────────────────────────────
+// ─── USER (Clerk identity — branch owner and/or member) ──────────────────────
 
 model User {
-  id          String     @id
-  name        String
-  email       String
-  image       String
-  cart        Json       @default("{}")
-  addresses   Address[]
-  buyerOrders Order[]    @relation("BuyerRelation")
-  ratings     Rating[]
-  wishlist    Wishlist[]
-  store       Store?
+  id       String   @id
+  name     String
+  email    String
+  image    String
+
+  branch   Branch?
+  member   Member?
 }
 
-// ─── STORE ───────────────────────────────────────────────────────────────────
+// ─── BRANCH (was Store) ───────────────────────────────────────────────────────
 
-model Store {
-  id           String       @id @default(cuid())
-  userId       String       @unique
-  name         String
-  description  String
-  username     String       @unique
-  address      String
-  status       StoreStatus  @default(PENDING)
-  isActive     Boolean      @default(false)
-  logo         String
-  email        String
-  contact      String
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+model Branch {
+  id              String          @id @default(cuid())
+  userId          String          @unique
+  name            String
+  description     String
+  username        String          @unique
+  address         String
+  phone           String
+  status          BranchStatus    @default(PENDING)
+  isActive        Boolean         @default(false)
+  logo            String
+  email           String
+  contact         String
+  operatingHours  String?
+  gstNumber       String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
-  user         User         @relation(fields: [userId], references: [id])
-  categories   Category[]
-  employees    Employee[]
-  inventories  Inventory[]
-  orders       Order[]
-  products     Product[]
-  commission   Commission?
-  shippingRules ShippingRule[]
+  user            User            @relation(fields: [userId], references: [id])
+  employees       Employee[]
+  planCategories  PlanCategory[]
+  membershipPlans MembershipPlan[]
+  ptPackages      PTPackage[]
+  members         Member[]
+  orders          Order[]
+  devices         BiometricDevice[]
+  commission      Commission?
 
   @@index([status])
   @@index([isActive])
 }
 
-// ─── COMMISSION ──────────────────────────────────────────────────────────────
+// ─── COMMISSION ────────────────────────────────────────────────────────────────
 
 model Commission {
   id         String   @id @default(cuid())
-  storeId    String   @unique
+  branchId   String   @unique
   percentage Float    @default(0)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  branch     Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
 }
 
-// ─── SHIPPING RULE ───────────────────────────────────────────────────────────
-
-model ShippingRule {
-  id          String   @id @default(cuid())
-  storeId     String?
-  name        String
-  minOrderAmt Float    @default(0)
-  cost        Float    @default(0)
-  isFree      Boolean  @default(false)
-  isGlobal    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  store       Store?   @relation(fields: [storeId], references: [id], onDelete: Cascade)
-
-  @@index([storeId])
-  @@index([isGlobal])
-}
-
-// ─── EMPLOYEE ────────────────────────────────────────────────────────────────
+// ─── EMPLOYEE (Receptionist / branch staff) ────────────────────────────────────
 
 model Employee {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   name        String
-  email       String   @unique
+  email       String       @unique
   password    String
-  storeId     String
-  permissions Json     @default("{}")
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  branchId    String
+  role        EmployeeRole @default(RECEPTIONIST)
+  permissions Json         @default("{}")
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  branch      Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  attendanceCorrections Attendance[] @relation("CorrectedByEmployee")
 
-  @@index([storeId])
+  @@index([branchId])
   @@index([email])
 }
 
-// ─── CATEGORY ────────────────────────────────────────────────────────────────
+// ─── PLAN CATEGORY (was Category) ──────────────────────────────────────────────
 
-model Category {
-  id          String    @id @default(cuid())
-  name        String
-  description String
-  image       String
-  isGlobal    Boolean   @default(false)
-  storeId     String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  store       Store?    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  products    ProductCategory[]
-
-  @@unique([name, storeId])
-  @@index([storeId])
-  @@index([isGlobal])
-}
-
-// ─── PRODUCT ─────────────────────────────────────────────────────────────────
-
-model Product {
-  id          String          @id @default(cuid())
-  storeId     String
-  name        String
-  slug        String
-  description String
-  brand       String?
-  keyFeatures String[]        @default([])
-  images      String[]
-  status      ProductStatus   @default(ACTIVE)
-  createdBy   String
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-
-  store       Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  variants    ProductVariant[]
-  categories  ProductCategory[]
-  ratings     Rating[]
-  wishlist    Wishlist[]
-
-  @@unique([slug, storeId])
-  @@index([storeId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-// ─── PRODUCT ↔ CATEGORY (join table) ─────────────────────────────────────────
-
-model ProductCategory {
-  productId  String
-  categoryId String
-
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  @@id([productId, categoryId])
-}
-
-// ─── PRODUCT VARIANT ─────────────────────────────────────────────────────────
-
-model ProductVariant {
+model PlanCategory {
   id          String   @id @default(cuid())
-  productId   String
-  color       String
-  size        String
-  price       Float
-  costPrice   Float    @default(0)
-  sku         String   @unique
-  stock       Int      @default(0)
+  name        String
+  description String
+  image       String?
+  isGlobal    Boolean  @default(false)
+  branchId    String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  product     Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
-  inventory   Inventory?
-  orderItems  OrderItem[]
+  branch      Branch?          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  plans       MembershipPlan[]
 
-  @@index([productId])
-  @@index([sku])
-  @@index([stock])
+  @@unique([name, branchId])
+  @@index([branchId])
+  @@index([isGlobal])
 }
 
-// ─── INVENTORY ───────────────────────────────────────────────────────────────
+// ─── MEMBERSHIP PLAN (was Product) ─────────────────────────────────────────────
 
-model Inventory {
-  id        String   @id @default(cuid())
-  variantId String   @unique
-  storeId   String
-  quantity  Int      @default(0)
-  lowStock  Int      @default(10)
-  updatedAt DateTime @updatedAt
+model MembershipPlan {
+  id            String        @id @default(cuid())
+  branchId      String
+  categoryId    String
+  name          String
+  slug          String
+  description   String
+  durationDays  Int
+  price         Float
+  features      String[]      @default([])
+  status        PlanStatus    @default(ACTIVE)
+  createdBy     String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  store     Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  branch        Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  category      PlanCategory  @relation(fields: [categoryId], references: [id])
+  memberships   Membership[]
+  orderItems    OrderItem[]
 
-  @@index([storeId])
-  @@index([variantId])
-  @@index([quantity])
+  @@unique([slug, branchId])
+  @@index([branchId])
+  @@index([status])
 }
 
-// ─── WISHLIST ─────────────────────────────────────────────────────────────────
+// ─── PT PACKAGE (new — personal training add-on) ──────────────────────────────
 
-model Wishlist {
-  id        String   @id @default(cuid())
-  userId    String
-  productId String
-  createdAt DateTime @default(now())
+model PTPackage {
+  id           String      @id @default(cuid())
+  branchId     String
+  name         String
+  sessionCount Int
+  price        Float
+  trainerName  String?
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  branch       Branch      @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  orderItems   OrderItem[]
 
-  @@unique([userId, productId])
-  @@index([userId])
+  @@index([branchId])
 }
 
-// ─── ORDER ───────────────────────────────────────────────────────────────────
+// ─── MEMBER (new — gym member profile) ─────────────────────────────────────────
+
+model Member {
+  id                     String    @id @default(cuid())
+  userId                 String?   @unique
+  branchId               String
+  fullName               String
+  phone                  String
+  photo                  String?
+  dob                    DateTime?
+  gender                 String?
+  address                String?
+  emergencyContactName   String
+  emergencyContactNumber String
+  deviceUserId           String?
+  joinDate               DateTime  @default(now())
+  status                 MemberStatus @default(ACTIVE)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  user          User?         @relation(fields: [userId], references: [id])
+  branch        Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  memberships   Membership[]
+  attendances   Attendance[]
+  orders        Order[]
+  notifications NotificationLog[]
+
+  @@unique([branchId, deviceUserId])
+  @@index([branchId])
+  @@index([phone])
+  @@index([status])
+}
+
+// ─── MEMBERSHIP (the subscription instance) ────────────────────────────────────
+
+model Membership {
+  id            String           @id @default(cuid())
+  memberId      String
+  planId        String
+  branchId      String
+  startDate     DateTime
+  expiryDate    DateTime
+  status        MembershipStatus @default(ACTIVE)
+  freezeStart   DateTime?
+  freezeEnd     DateTime?
+  freezeReason  String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  member        Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  plan          MembershipPlan   @relation(fields: [planId], references: [id])
+
+  @@index([memberId])
+  @@index([branchId])
+  @@index([status])
+  @@index([expiryDate])
+}
+
+// ─── ATTENDANCE (new) ───────────────────────────────────────────────────────────
+
+model Attendance {
+  id                String            @id @default(cuid())
+  memberId          String
+  branchId          String
+  checkIn           DateTime
+  checkOut          DateTime?
+  method            AttendanceMethod  @default(BIOMETRIC)
+  deviceUserId      String?
+  deviceSerial      String?
+  verified          Boolean           @default(true)
+  correctedById     String?
+  correctionReason  String?
+  createdAt         DateTime          @default(now())
+
+  member            Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  correctedBy       Employee?         @relation("CorrectedByEmployee", fields: [correctedById], references: [id])
+
+  @@index([memberId])
+  @@index([branchId])
+  @@index([checkIn])
+  @@index([verified])
+}
+
+// ─── BIOMETRIC DEVICE (new — maps hardware to branch) ──────────────────────────
+
+model BiometricDevice {
+  id           String    @id @default(cuid())
+  branchId     String
+  deviceSerial String    @unique
+  name         String
+  location     String?
+  isActive     Boolean   @default(true)
+  lastSyncAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  branch       Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@index([branchId])
+}
+
+// ─── ORDER (membership purchase / renewal / bundled cart) ──────────────────────
 
 model Order {
-  id            String          @id @default(cuid())
-  userId        String
-  storeId       String
-  addressId     String
-  subtotal      Float
-  shippingCost  Float           @default(0)
-  commissionAmt Float           @default(0)
-  total         Float
-  status        OrderStatus     @default(PENDING)
-  isPaid        Boolean         @default(false)
-  paymentMethod PaymentMethod
-  paymentRef    String?
-  isCouponUsed  Boolean         @default(false)
-  couponCode    String?
-  couponDiscount Float          @default(0)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id             String          @id @default(cuid())
+  memberId       String
+  branchId       String
+  subtotal       Float
+  commissionAmt  Float           @default(0)
+  total          Float
+  status         OrderStatus     @default(PENDING)
+  isPaid         Boolean         @default(false)
+  paymentMethod  PaymentMethod
+  paymentRef     String?
+  isCouponUsed   Boolean         @default(false)
+  couponCode     String?
+  couponDiscount Float           @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
-  user          User            @relation("BuyerRelation", fields: [userId], references: [id])
-  store         Store           @relation(fields: [storeId], references: [id])
-  address       Address         @relation(fields: [addressId], references: [id])
-  orderItems    OrderItem[]
-  timeline      OrderTimeline[]
+  member         Member          @relation(fields: [memberId], references: [id])
+  branch         Branch          @relation(fields: [branchId], references: [id])
+  orderItems     OrderItem[]
+  timeline       OrderTimeline[]
 
-  @@index([storeId])
-  @@index([userId])
+  @@index([branchId])
+  @@index([memberId])
   @@index([status])
   @@index([createdAt])
 }
 
-// ─── ORDER ITEM ───────────────────────────────────────────────────────────────
+// ─── ORDER ITEM (plan / PT package / supplement line item) ─────────────────────
 
 model OrderItem {
-  id        String @id @default(cuid())
-  orderId   String
-  productId String
-  variantId String
-  quantity  Int
-  price     Float
+  id               String          @id @default(cuid())
+  orderId          String
+  itemType         OrderItemType
+  membershipPlanId String?
+  ptPackageId      String?
+  name             String
+  quantity         Int             @default(1)
+  price            Float
 
-  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  variant   ProductVariant @relation(fields: [variantId], references: [id])
+  order            Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  membershipPlan   MembershipPlan? @relation(fields: [membershipPlanId], references: [id])
+  ptPackage        PTPackage?      @relation(fields: [ptPackageId], references: [id])
 
   @@index([orderId])
-  @@index([variantId])
 }
 
 // ─── ORDER TIMELINE ──────────────────────────────────────────────────────────
@@ -285,43 +318,25 @@ model OrderTimeline {
   @@index([createdAt])
 }
 
-// ─── RATING / REVIEW ─────────────────────────────────────────────────────────
+// ─── NOTIFICATION LOG (new — Phase 6 reminders) ────────────────────────────────
 
-model Rating {
-  id        String   @id @default(cuid())
-  rating    Int
-  review    String
-  userId    String
-  productId String
-  orderId   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model NotificationLog {
+  id           String               @id @default(cuid())
+  memberId     String
+  branchId     String
+  channel      NotificationChannel
+  type         NotificationType
+  status       NotificationStatus   @default(PENDING)
+  messageRef   String?
+  errorMessage String?
+  createdAt    DateTime             @default(now())
 
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  member       Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, productId, orderId])
-  @@index([productId])
-  @@index([userId])
-}
-
-// ─── ADDRESS ─────────────────────────────────────────────────────────────────
-
-model Address {
-  id        String   @id @default(cuid())
-  userId    String
-  name      String
-  email     String
-  street    String
-  city      String
-  state     String
-  zip       String
-  country   String
-  phone     String
-  createdAt DateTime @default(now())
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orders    Order[]
+  @@index([memberId])
+  @@index([branchId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 // ─── COUPON ──────────────────────────────────────────────────────────────────
@@ -330,7 +345,7 @@ model Coupon {
   code        String   @id
   description String
   discount    Float
-  forNewUser  Boolean
+  forNewMember Boolean
   forMember   Boolean  @default(false)
   isPublic    Boolean
   expiresAt   DateTime
@@ -339,7 +354,7 @@ model Coupon {
 
 // ─── ENUMS ───────────────────────────────────────────────────────────────────
 
-enum StoreStatus {
+enum BranchStatus {
   PENDING
   APPROVED
   REJECTED
@@ -347,24 +362,69 @@ enum StoreStatus {
   INACTIVE
 }
 
-enum ProductStatus {
+enum EmployeeRole {
+  RECEPTIONIST
+  MANAGER
+}
+
+enum PlanStatus {
   ACTIVE
   INACTIVE
   DRAFT
 }
 
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+  FROZEN
+  CANCELLED
+}
+
+enum AttendanceMethod {
+  BIOMETRIC
+  MANUAL
+  QR
+}
+
 enum OrderStatus {
   PENDING
   CONFIRMED
-  PACKED
-  SHIPPED
-  OUT_FOR_DELIVERY
-  DELIVERED
+  ACTIVE
   CANCELLED
-  RETURNED
+}
+
+enum OrderItemType {
+  MEMBERSHIP_PLAN
+  PT_PACKAGE
+  SUPPLEMENT
 }
 
 enum PaymentMethod {
-  COD
-  STRIPE
+  CASH
+  UPI
+  CARD
+  RAZORPAY
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  SMS
+  EMAIL
+}
+
+enum NotificationType {
+  EXPIRY_REMINDER
+  PAYMENT_DUE
+  RENEWAL_CONFIRMATION
+}
+
+enum NotificationStatus {
+  SENT
+  FAILED
+  PENDING
 }

@@ -15,17 +15,17 @@ export async function GET(request) {
       );
     }
 
-    // Re-fetch from DB to get latest permissions + status
     const employee = await prisma.employee.findUnique({
       where: { id: decoded.employeeId },
       select: {
         id: true,
         name: true,
         email: true,
+        role: true,
         permissions: true,
         isActive: true,
-        storeId: true,
-        store: {
+        branchId: true,
+        branch: {
           select: {
             id: true,
             name: true,
@@ -49,17 +49,14 @@ export async function GET(request) {
       );
     }
 
-    if (employee.store.status !== 'ACTIVE' || !employee.store.isActive) {
-      return NextResponse.json(
-        { valid: false, error: 'Store is not active' },
-        { status: 403 }
-      );
+    if (employee.branch.status !== 'ACTIVE' || !employee.branch.isActive) {
+      return NextResponse.json({ valid: false, error: 'Branch is not active' }, { status: 403 });
     }
 
     return NextResponse.json({
       valid: true,
       employee,
-      store: employee.store,
+      branch: employee.branch,
     });
   } catch (error) {
     console.error('GET /api/store/employee-auth error:', error);
