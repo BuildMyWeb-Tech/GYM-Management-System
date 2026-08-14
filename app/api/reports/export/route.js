@@ -1,113 +1,143 @@
 // app/api/reports/export/route.js
 import prisma from '@/lib/prisma';
-import authAdmin from '@/middlewares/authAdmin';
-import authSeller from '@/middlewares/authSeller';
-import { getAuth } from '@clerk/nextjs/server';
+import { resolveReportAccess } from '@/lib/reportAccess';
 import { NextResponse } from 'next/server';
 import { buildDateRange, round2, EXCLUDED_STATUSES } from '@/lib/reportUtils';
-
-async function resolveRole(request) {
-  const { userId } = getAuth(request);
-  if (!userId) return { role: null, storeId: null };
-  const isAdminUser = await authAdmin(userId);
-  if (isAdminUser) return { role: 'ADMIN', storeId: null };
-  const storeId = await authSeller(userId);
-  if (storeId) return { role: 'STORE', storeId };
-  return { role: null, storeId: null };
-}
 
 function toCSV(rows, columns) {
   const header = columns.map((c) => `"${c.label}"`).join(',');
   const body = rows.map((row) =>
-    columns.map((c) => {
-      const val = row[c.key] ?? '';
-      return typeof val === 'string' ? `"${val.replace(/"/g, '""')}"` : val;
-    }).join(',')
+    columns
+      .map((c) => {
+        const val = row[c.key] ?? '';
+        return typeof val === 'string' ? `"${val.replace(/"/g, '""')}"` : val;
+      })
+      .join(',')
   );
   return [header, ...body].join('\n');
 }
 
-// GET /api/reports/export
 export async function GET(request) {
   try {
-    const { role, storeId: myStoreId } = await resolveRole(request);
+    const { role, branchId: myBranchId } = await resolveReportAccess(request);
     if (!role) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
-    const format      = searchParams.get('format') || 'csv';
-    const period      = searchParams.get('period') || 'month';
-    const from        = searchParams.get('from');
-    const to          = searchParams.get('to');
-    const filterStore = searchParams.get('storeId');
+    const type = searchParams.get('type') || 'orders'; // orders | attendance
+    const format = searchParams.get('format') || 'csv';
+    const period = searchParams.get('period') || 'month';
+    const from = searchParams.get('from');
+    const to = searchParams.get('to');
+    const filterBranch = searchParams.get('branchId');
 
     const dateRange = buildDateRange(period, from, to);
-    if (!dateRange) {
+    if (!dateRange)
       return NextResponse.json(
         { error: 'Custom period requires valid "from" and "to" dates' },
         { status: 400 }
       );
+
+    const scopedBranchId = role === 'ADMIN' ? filterBranch || undefined : myBranchId;
+
+    if (type === 'attendance') {
+      const records = await prisma.attendance.findMany({
+        where: { checkIn: dateRange, ...(scopedBranchId ? { branchId: scopedBranchId } : {}) },
+        include: { member: { select: { fullName: true, phone: true } } },
+        orderBy: { checkIn: 'desc' },
+        take: 10000,
+      });
+
+      const rows = records.map((r) => ({
+        memberName: r.member.fullName,
+        phone: r.member.phone,
+        checkIn: r.checkIn.toISOString(),
+        checkOut: r.checkOut ? r.checkOut.toISOString() : '',
+        method: r.method,
+        verified: r.verified ? 'Yes' : 'No',
+      }));
+
+      const columns = [
+        { key: 'memberName', label: 'Member' },
+        { key: 'phone', label: 'Phone' },
+        { key: 'checkIn', label: 'Check-in' },
+        { key: 'checkOut', label: 'Check-out' },
+        { key: 'method', label: 'Method' },
+        { key: 'verified', label: 'Membership Active' },
+      ];
+
+      if (format === 'csv') {
+        return new Response(toCSV(rows, columns), {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': `attachment; filename="attendance-report-${period}-${Date.now()}.csv"`,
+          },
+        });
+      }
+      return NextResponse.json({
+        format: 'pdf',
+        rows,
+        columns,
+        generatedAt: new Date().toISOString(),
+      });
     }
 
-    const scopedStoreId = role === 'ADMIN' ? filterStore || undefined : myStoreId;
-
+    // type === 'orders'
     const orders = await prisma.order.findMany({
       where: {
         createdAt: dateRange,
         status: { notIn: EXCLUDED_STATUSES },
-        ...(scopedStoreId ? { storeId: scopedStoreId } : {}),
+        ...(scopedBranchId ? { branchId: scopedBranchId } : {}),
       },
       include: {
-        store: { select: { name: true, username: true } },
-        user:  { select: { name: true, email: true } },
+        branch: { select: { name: true, username: true } },
+        member: { select: { fullName: true, phone: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 10000,
     });
 
     const rows = orders.map((o) => ({
-      id:               o.id,
-      storeName:        o.store?.name || '',
-      customerName:     o.user?.name || '',
-      customerEmail:    o.user?.email || '',
-      subtotal:         round2(o.subtotal),
-      shippingCost:     round2(o.shippingCost),
-      couponDiscount:   round2(o.couponDiscount),
-      commissionAmt:    round2(o.commissionAmt),
-      total:            round2(o.total),
-      status:           o.status,
-      paymentMethod:    o.paymentMethod,
-      date:             o.createdAt.toISOString().split('T')[0],
-      time:             o.createdAt.toTimeString().split(' ')[0],
+      id: o.id,
+      branchName: o.branch?.name || '',
+      memberName: o.member?.fullName || '',
+      memberPhone: o.member?.phone || '',
+      subtotal: round2(o.subtotal),
+      couponDiscount: round2(o.couponDiscount),
+      commissionAmt: round2(o.commissionAmt),
+      total: round2(o.total),
+      status: o.status,
+      paymentMethod: o.paymentMethod,
+      date: o.createdAt.toISOString().split('T')[0],
+      time: o.createdAt.toTimeString().split(' ')[0],
     }));
 
     const columns = [
-      { key: 'id',             label: 'Order ID' },
-      { key: 'storeName',      label: 'Store' },
-      { key: 'customerName',   label: 'Customer' },
-      { key: 'customerEmail',  label: 'Email' },
-      { key: 'subtotal',       label: 'Subtotal (₹)' },
-      { key: 'shippingCost',   label: 'Shipping (₹)' },
+      { key: 'id', label: 'Order ID' },
+      { key: 'branchName', label: 'Branch' },
+      { key: 'memberName', label: 'Member' },
+      { key: 'memberPhone', label: 'Phone' },
+      { key: 'subtotal', label: 'Subtotal (₹)' },
       { key: 'couponDiscount', label: 'Discount (₹)' },
-      { key: 'commissionAmt',  label: 'Commission (₹)' },
-      { key: 'total',          label: 'Total (₹)' },
-      { key: 'status',         label: 'Status' },
-      { key: 'paymentMethod',  label: 'Payment' },
-      { key: 'date',           label: 'Date' },
-      { key: 'time',           label: 'Time' },
+      { key: 'commissionAmt', label: 'Commission (₹)' },
+      { key: 'total', label: 'Total (₹)' },
+      { key: 'status', label: 'Status' },
+      { key: 'paymentMethod', label: 'Payment' },
+      { key: 'date', label: 'Date' },
+      { key: 'time', label: 'Time' },
     ];
 
     if (format === 'csv') {
-      const csv = toCSV(rows, columns);
-      return new Response(csv, {
+      return new Response(toCSV(rows, columns), {
         status: 200,
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename="orders-report-${period}-${Date.now()}.csv"`,
+          'Content-Disposition': `attachment; filename="revenue-report-${period}-${Date.now()}.csv"`,
         },
       });
     }
 
-    const totalRevenue    = round2(rows.reduce((s, r) => s + r.total, 0));
+    const totalRevenue = round2(rows.reduce((s, r) => s + r.total, 0));
     const totalCommission = round2(rows.reduce((s, r) => s + r.commissionAmt, 0));
 
     return NextResponse.json({
@@ -115,12 +145,10 @@ export async function GET(request) {
       summary: {
         totalRevenue,
         totalCommission,
-        storeRevenue: round2(totalRevenue - totalCommission),
+        branchRevenue: round2(totalRevenue - totalCommission),
         totalOrders: rows.length,
         aov: rows.length > 0 ? round2(totalRevenue / rows.length) : 0,
         period,
-        from: dateRange.gte.toISOString().split('T')[0],
-        to:   dateRange.lte.toISOString().split('T')[0],
         generatedAt: new Date().toISOString(),
       },
       rows,

@@ -4,7 +4,7 @@ import {
   ShieldCheckIcon, TrendingDown,
 } from 'lucide-react';
 import { useState } from 'react';
-import AddressModal from './AddressModal';
+// import AddressModal from './AddressModal';
 import { useDispatch, useSelector } from 'react-redux';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
