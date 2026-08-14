@@ -1,7 +1,21 @@
 // components/store/StoreSidebar.jsx
 'use client';
 import { usePathname, useRouter } from 'next/navigation';
-import { HomeIcon, LayoutListIcon, BarChart2, ShoppingBag, Settings,CreditCard, X, ChevronRight, ChevronLeft, Users, UserCog } from 'lucide-react';
+import {
+  HomeIcon,
+  LayoutListIcon,
+  BarChart2,
+  ShoppingBag,
+  Settings,
+  X,
+  ChevronRight,
+  ChevronLeft,
+  Users,
+  UserCog,
+  CreditCard,
+  CalendarCheck,
+  Fingerprint,
+} from 'lucide-react';
 
 import Image from 'next/image';
 import Link from 'next/link';
@@ -11,11 +25,13 @@ import { PERMISSIONS } from '@/middlewares/authEmployee';
 const ALL_LINKS = [
   { name: 'Dashboard',      href: '/store',            icon: HomeIcon,       permission: null },
   { name: 'Members',        href: '/store/members',    icon: Users,          permission: PERMISSIONS.MANAGE_MEMBERS },
+  { name: 'Attendance',     href: '/store/attendance', icon: CalendarCheck,  permission: PERMISSIONS.MARK_ATTENDANCE },
   { name: 'Plans',          href: '/store/plans',      icon: LayoutListIcon, permission: PERMISSIONS.MANAGE_MEMBERSHIPS },
   { name: 'Checkout',       href: '/store/checkout',   icon: CreditCard,     permission: PERMISSIONS.COLLECT_PAYMENT },
   { name: 'Orders',         href: '/store/orders',     icon: ShoppingBag,    permission: PERMISSIONS.COLLECT_PAYMENT },
   { name: 'Reports',        href: '/store/analytics',  icon: BarChart2,      permission: PERMISSIONS.VIEW_REPORTS },
   { name: 'Receptionists',  href: '/store/employees',  icon: UserCog,        permission: null, ownerOnly: true },
+  { name: 'Devices',        href: '/store/devices',    icon: Fingerprint,    permission: null, ownerOnly: true },
   { name: 'Branch Settings',href: '/store/settings',   icon: Settings,       permission: PERMISSIONS.MANAGE_BRANCH_SETTINGS },
 ];
 

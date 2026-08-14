@@ -2,19 +2,50 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { HomeIcon, ShoppingBag, BarChart2, Layers, Users, X,CreditCard, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
+import { HomeIcon, ShoppingBag, BarChart2, Layers, Users, CreditCard, CalendarCheck, X, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 
 import Image from 'next/image';
 import { useState } from 'react';
 import { PERMISSIONS } from '@/middlewares/authEmployee';
 
 const ALL_LINKS = [
-  { name: 'Dashboard',       href: '/employee/dashboard', icon: HomeIcon,    permission: null },
-  { name: 'Members',         href: '/employee/members',   icon: Users,       permission: PERMISSIONS.MANAGE_MEMBERS },
-  { name: 'Plans',           href: '/employee/plans',     icon: Layers,      permission: PERMISSIONS.MANAGE_MEMBERSHIPS },
-  { name: 'Checkout',        href: '/employee/checkout',  icon: CreditCard,  permission: PERMISSIONS.COLLECT_PAYMENT },
-  { name: 'Orders',          href: '/employee/orders',    icon: ShoppingBag, permission: PERMISSIONS.COLLECT_PAYMENT },
-  { name: 'Reports',         href: '/employee/reports',   icon: BarChart2,   permission: PERMISSIONS.VIEW_REPORTS },
+  { name: 'Dashboard', href: '/employee/dashboard', icon: HomeIcon, permission: null },
+  {
+    name: 'Members',
+    href: '/employee/members',
+    icon: Users,
+    permission: PERMISSIONS.MANAGE_MEMBERS,
+  },
+  {
+    name: 'Attendance',
+    href: '/employee/attendance',
+    icon: CalendarCheck,
+    permission: PERMISSIONS.MARK_ATTENDANCE,
+  },
+  {
+    name: 'Plans',
+    href: '/employee/plans',
+    icon: Layers,
+    permission: PERMISSIONS.MANAGE_MEMBERSHIPS,
+  },
+  {
+    name: 'Checkout',
+    href: '/employee/checkout',
+    icon: CreditCard,
+    permission: PERMISSIONS.COLLECT_PAYMENT,
+  },
+  {
+    name: 'Orders',
+    href: '/employee/orders',
+    icon: ShoppingBag,
+    permission: PERMISSIONS.COLLECT_PAYMENT,
+  },
+  {
+    name: 'Reports',
+    href: '/employee/reports',
+    icon: BarChart2,
+    permission: PERMISSIONS.VIEW_REPORTS,
+  },
 ];
 
 export default function EmployeeSidebar({ branchInfo, employee, closeMobileMenu }) {

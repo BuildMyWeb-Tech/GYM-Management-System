@@ -242,6 +242,7 @@ model BiometricDevice {
   id           String    @id @default(cuid())
   branchId     String
   deviceSerial String    @unique
+  secret       String    @unique @default(cuid())
   name         String
   location     String?
   isActive     Boolean   @default(true)
