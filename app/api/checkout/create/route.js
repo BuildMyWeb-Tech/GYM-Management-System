@@ -51,40 +51,43 @@ export async function POST(request) {
 
     const isImmediate = paymentMethod !== 'RAZORPAY';
 
-    const order = await prisma.$transaction(async (tx) => {
-      const createdOrder = await tx.order.create({
-        data: {
-          memberId,
-          branchId,
-          subtotal,
-          commissionAmt,
-          total,
-          status: isImmediate ? 'CONFIRMED' : 'PENDING',
-          isPaid: isImmediate,
-          paymentMethod,
-          isCouponUsed: !!appliedCode,
-          couponCode: appliedCode,
-          couponDiscount,
-          orderItems: { create: resolvedItems },
-        },
-        include: { orderItems: true },
-      });
+    const order = await prisma.$transaction(
+      async (tx) => {
+        const createdOrder = await tx.order.create({
+          data: {
+            memberId,
+            branchId,
+            subtotal,
+            commissionAmt,
+            total,
+            status: isImmediate ? 'CONFIRMED' : 'PENDING',
+            isPaid: isImmediate,
+            paymentMethod,
+            isCouponUsed: !!appliedCode,
+            couponCode: appliedCode,
+            couponDiscount,
+            orderItems: { create: resolvedItems },
+          },
+          include: { orderItems: true },
+        });
 
-      await tx.orderTimeline.create({
-        data: {
-          orderId: createdOrder.id,
-          status: createdOrder.status,
-          changedBy: access.isOwner ? 'owner' : access.employee.employeeId,
-          note: isImmediate ? `Paid via ${paymentMethod}` : 'Awaiting online payment',
-        },
-      });
+        await tx.orderTimeline.create({
+          data: {
+            orderId: createdOrder.id,
+            status: createdOrder.status,
+            changedBy: access.isOwner ? 'owner' : access.employee.employeeId,
+            note: isImmediate ? `Paid via ${paymentMethod}` : 'Awaiting online payment',
+          },
+        });
 
-      if (isImmediate) {
-        await activateMembershipsForOrder(tx, { branchId, memberId }, createdOrder.orderItems);
-      }
+        if (isImmediate) {
+          await activateMembershipsForOrder(tx, { branchId, memberId }, createdOrder.orderItems);
+        }
 
-      return createdOrder;
-    });
+        return createdOrder;
+      },
+      { maxWait: 10000, timeout: 15000 }
+    );
 
     if (isImmediate) {
       return NextResponse.json(

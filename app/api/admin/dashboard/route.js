@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import authAdmin from '@/middlewares/authAdmin';
 import { getAdminUserId } from '@/lib/getAdminUserId';
 import { NextResponse } from 'next/server';
-import { round2, EXCLUDED_STATUSES, toISTDateKey } from '@/lib/reportUtils';
+import { round2, EXCLUDED_STATUSES, toISTDateKey, fmtDay } from '@/lib/reportUtils';
 
 export async function GET(request) {
   try {
@@ -11,151 +11,110 @@ export async function GET(request) {
     const isAdminUser = await authAdmin(userId);
     if (!isAdminUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-    const todayStart = new Date();
+    const now = new Date();
+    const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
 
+    const rangeStart = new Date(now);
+    rangeStart.setDate(rangeStart.getDate() - 13);
+    rangeStart.setHours(0, 0, 0, 0);
+
     const [
-      totalOrders, totalStores, activeStores, pendingStores, totalProducts, totalCustomers,
-      revenueAgg, todayRevenueAgg,
-      pendingOrders, confirmedOrders, packedOrders, shippedOrders,
-      outForDeliveryOrders, deliveredOrders, cancelledOrders, returnedOrders,
-      topStoresRaw, recentOrders, lowStockVariants, last90DaysOrders,
+      totalBranches,
+      activeBranches,
+      pendingBranches,
+      totalMembers,
+      totalEmployees,
+      activeMemberships,
+      expiredMembershipsRaw,
+      frozenMemberships,
+      todayAttendance,
+      revenueAgg,
+      recentOrders,
+      topBranchesRaw,
+      branchStatusCounts,
     ] = await Promise.all([
-      prisma.order.count(),
-      prisma.store.count(),
-      prisma.store.count({ where: { status: 'ACTIVE', isActive: true } }),
-      prisma.store.count({ where: { status: 'PENDING' } }),
-      prisma.product.count(),
-      prisma.user.count({ where: { store: null } }),
-
+      prisma.branch.count(),
+      prisma.branch.count({ where: { status: 'ACTIVE', isActive: true } }),
+      prisma.branch.count({ where: { status: 'PENDING' } }),
+      prisma.member.count(),
+      prisma.employee.count(),
+      prisma.membership.count({ where: { status: 'ACTIVE', expiryDate: { gte: now } } }),
+      prisma.membership.count({
+        where: { OR: [{ status: 'EXPIRED' }, { status: 'ACTIVE', expiryDate: { lt: now } }] },
+      }),
+      prisma.membership.count({ where: { status: 'FROZEN' } }),
+      prisma.attendance.count({ where: { checkIn: { gte: todayStart } } }),
       prisma.order.aggregate({
-        where: { status: { notIn: EXCLUDED_STATUSES } },
+        where: { isPaid: true, status: { notIn: EXCLUDED_STATUSES } },
         _sum: { total: true, commissionAmt: true },
       }),
-      prisma.order.aggregate({
-        where: { createdAt: { gte: todayStart }, status: { notIn: EXCLUDED_STATUSES } },
-        _sum: { total: true, commissionAmt: true },
-        _count: { id: true },
+      prisma.order.findMany({
+        where: { createdAt: { gte: rangeStart }, status: { notIn: EXCLUDED_STATUSES } },
+        select: { total: true, createdAt: true },
       }),
-
-      prisma.order.count({ where: { status: 'PENDING' } }),
-      prisma.order.count({ where: { status: 'CONFIRMED' } }),
-      prisma.order.count({ where: { status: 'PACKED' } }),
-      prisma.order.count({ where: { status: 'SHIPPED' } }),
-      prisma.order.count({ where: { status: 'OUT_FOR_DELIVERY' } }),
-      prisma.order.count({ where: { status: 'DELIVERED' } }),
-      prisma.order.count({ where: { status: 'CANCELLED' } }),
-      prisma.order.count({ where: { status: 'RETURNED' } }),
-
       prisma.order.groupBy({
-        by: ['storeId'],
-        where: {
-          status: { notIn: EXCLUDED_STATUSES },
-          createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
-        },
-        _sum: { total: true, commissionAmt: true },
-        _count: { id: true },
+        by: ['branchId'],
+        where: { status: { notIn: EXCLUDED_STATUSES } },
+        _sum: { total: true },
         orderBy: { _sum: { total: 'desc' } },
         take: 5,
       }),
-
-      prisma.order.findMany({
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          user:  { select: { name: true, email: true } },
-          store: { select: { name: true, username: true } },
-        },
-      }),
-
-      prisma.productVariant.findMany({
-        where: { stock: { lte: 5 } },
-        include: {
-          product: {
-            select: {
-              id: true, name: true,
-              store: { select: { id: true, name: true } },
-            },
-          },
-        },
-        orderBy: { stock: 'asc' },
-        take: 20,
-      }),
-
-      // ✅ Widened from 30 → 90 days, no status filter (counts ALL orders
-      // placed; revenue per-day still excludes CANCELLED/RETURNED below)
-      prisma.order.findMany({
-        where: {
-          createdAt: { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
-        },
-        select: { total: true, commissionAmt: true, createdAt: true, status: true },
-        orderBy: { createdAt: 'asc' },
-      }),
+      prisma.branch.groupBy({ by: ['status'], _count: { id: true } }),
     ]);
 
-    // Hydrate top stores
-    const topStoreIds = topStoresRaw.map((g) => g.storeId);
-    const topStoreDetails = await prisma.store.findMany({
-      where: { id: { in: topStoreIds } },
-      select: { id: true, name: true, logo: true, username: true },
-    });
-    const storeDetailMap = Object.fromEntries(topStoreDetails.map((s) => [s.id, s]));
-    const topStores = topStoresRaw.map((g, idx) => {
-      const s = storeDetailMap[g.storeId] || {};
-      return {
-        rank: idx + 1, storeId: g.storeId,
-        name: s.name || 'Unknown', logo: s.logo || null, username: s.username || '',
-        revenue: round2(g._sum.total || 0),
-        commission: round2(g._sum.commissionAmt || 0),
-        orders: g._count.id,
-      };
-    });
-
-    // ✅ Daily chart data — 90 days, IST-aligned bucketing (matches
-    // toISTDateKey used elsewhere in the reporting system).
-    // Every order counts toward "orders placed"; revenue/commission
-    // exclude CANCELLED/RETURNED per EXCLUDED_STATUSES.
+    // Revenue trend — last 14 days, IST bucketed
     const buckets = {};
-    for (const o of last90DaysOrders) {
+    for (const o of recentOrders) {
       const key = toISTDateKey(o.createdAt);
-      if (!buckets[key]) buckets[key] = { revenue: 0, commission: 0, count: 0 };
-      buckets[key].count += 1;
-      if (!EXCLUDED_STATUSES.includes(o.status)) {
-        buckets[key].revenue    += o.total;
-        buckets[key].commission += o.commissionAmt;
-      }
+      buckets[key] = (buckets[key] || 0) + o.total;
     }
-    const dailyData = Object.entries(buckets).map(([date, data]) => ({
-      date,
-      revenue: round2(data.revenue),
-      commission: round2(data.commission),
-      count: data.count,
-    }));
+    const revenueTrend = [];
+    const cursor = new Date(rangeStart);
+    while (cursor <= now) {
+      const key = toISTDateKey(cursor);
+      revenueTrend.push({ date: key, label: fmtDay(cursor), revenue: round2(buckets[key] || 0) });
+      cursor.setDate(cursor.getDate() + 1);
+    }
 
-    const totalRevenue    = round2(revenueAgg._sum.total || 0);
-    const totalCommission = round2(revenueAgg._sum.commissionAmt || 0);
+    // Top branches with names
+    const topBranches = await Promise.all(
+      topBranchesRaw.map(async (t) => {
+        const branch = await prisma.branch.findUnique({
+          where: { id: t.branchId },
+          select: { name: true },
+        });
+        return { name: branch?.name || 'Unknown', revenue: round2(t._sum.total || 0) };
+      })
+    );
+
+    // Branch status pie
+    const branchStatusPie = branchStatusCounts.map((b) => ({ name: b.status, value: b._count.id }));
+
+    // Membership status pie
+    const membershipStatusPie = [
+      { name: 'Active', value: activeMemberships },
+      { name: 'Expired', value: expiredMembershipsRaw },
+      { name: 'Frozen', value: frozenMemberships },
+    ];
 
     return NextResponse.json({
       dashboardData: {
-        totalOrders, totalStores, activeStores, pendingStores, totalProducts, totalCustomers,
-        totalRevenue, totalCommission,
-        platformRevenue: totalCommission,
-        storeRevenue: round2(totalRevenue - totalCommission),
-        todayOrders:     todayRevenueAgg._count.id || 0,
-        todayRevenue:    round2(todayRevenueAgg._sum.total || 0),
-        todayCommission: round2(todayRevenueAgg._sum.commissionAmt || 0),
-        orderStatus: {
-          pending: pendingOrders, confirmed: confirmedOrders, packed: packedOrders,
-          shipped: shippedOrders, outForDelivery: outForDeliveryOrders,
-          delivered: deliveredOrders, cancelled: cancelledOrders, returned: returnedOrders,
-        },
-        topStores, recentOrders, dailyData,
-        lowStockAlerts: lowStockVariants.map((v) => ({
-          variantId: v.id, color: v.color, size: v.size, sku: v.sku, stock: v.stock,
-          productId: v.productId, productName: v.product.name,
-          storeName: v.product.store?.name || '',
-          storeId:   v.product.store?.id || '',
-        })),
+        totalBranches,
+        activeBranches,
+        pendingBranches,
+        totalMembers,
+        totalEmployees,
+        activeMemberships,
+        expiredMemberships: expiredMembershipsRaw,
+        frozenMemberships,
+        todayAttendance,
+        totalRevenue: round2(revenueAgg._sum.total || 0),
+        totalCommission: round2(revenueAgg._sum.commissionAmt || 0),
+        revenueTrend,
+        topBranches,
+        branchStatusPie,
+        membershipStatusPie,
       },
     });
   } catch (error) {

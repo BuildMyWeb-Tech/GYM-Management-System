@@ -11,10 +11,21 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'ALL';
+    const q = searchParams.get('q')?.trim() || '';
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-    const limit = Math.min(50, parseInt(searchParams.get('limit') || '20', 10));
+    const limit = Math.min(50, parseInt(searchParams.get('limit') || '15', 10));
 
-    const where = { branchId: access.branchId, ...(status !== 'ALL' ? { status } : {}) };
+    const where = {
+      branchId: access.branchId,
+      ...(status !== 'ALL' ? { status } : {}),
+      ...(q
+        ? {
+            member: {
+              OR: [{ fullName: { contains: q, mode: 'insensitive' } }, { phone: { contains: q } }],
+            },
+          }
+        : {}),
+    };
 
     const [orders, total] = await Promise.all([
       prisma.order.findMany({

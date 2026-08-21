@@ -115,25 +115,7 @@ const Footer = () => {
           ))}
         </div>
 
-        <div className="py-6 flex flex-col gap-2 md:flex-row md:justify-between text-sm text-slate-500">
-          <p>
-            © {new Date().getFullYear()}{' '}
-            <Link href="/" className="text-green-600 hover:underline">
-              GymDesk
-            </Link>
-            . All rights reserved.
-          </p>
-          <p>
-            Designed & Developed by{' '}
-            <Link
-              href="https://buildmyweb.info/"
-              target="_blank"
-              className="text-green-600 hover:underline"
-            >
-              BuildMyWeb
-            </Link>
-          </p>
-        </div>
+        
       </div>
     </footer>
   );

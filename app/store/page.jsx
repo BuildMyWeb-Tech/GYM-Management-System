@@ -11,6 +11,8 @@ import {
   Briefcase,
   IndianRupee,
   ShoppingCart,
+  AlertTriangle,
+  Phone,
   RefreshCcw,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -153,7 +155,7 @@ export default function StoreDashboard() {
           icon={Briefcase}
           color="purple"
         />
-        <StatCard title="Total Orders" value={dash.totalOrders} icon={ShoppingCart} color="slate" />
+        <StatCard title="Total Payments" value={dash.totalOrders} icon={ShoppingCart} color="slate" />
         <StatCard
           title="Total Revenue"
           value={`₹${Number(dash.totalRevenue || 0).toLocaleString('en-IN')}`}
@@ -162,10 +164,40 @@ export default function StoreDashboard() {
         />
       </div>
 
-      <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-6 text-center text-sm text-slate-400">
-        Attendance trends, revenue charts, and membership breakdowns will populate here as members
-        and attendance data come online in later phases.
-      </div>
+      {dash.expiringSoon?.length > 0 ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
+          <div className="p-4 border-b border-amber-200 flex items-center gap-2">
+            <AlertTriangle size={16} className="text-amber-600" />
+            <h3 className="font-semibold text-amber-800 text-sm">Memberships Expiring in 3 Days</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <tbody>
+                {dash.expiringSoon.map((m, i) => (
+                  <tr key={i} className="border-b border-amber-100 last:border-0">
+                    <td className="px-4 py-2.5 text-slate-800 font-medium whitespace-nowrap">
+                      {m.memberName}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-500 whitespace-nowrap">
+                      <span className="flex items-center gap-1.5">
+                        <Phone size={12} /> {m.phone}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{m.planName}</td>
+                    <td className="px-4 py-2.5 text-amber-700 text-xs font-medium whitespace-nowrap">
+                      {new Date(m.expiryDate).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-6 text-center text-sm text-slate-400">
+          No memberships expiring in the next 3 days.
+        </div>
+      )}
     </div>
   );
 }

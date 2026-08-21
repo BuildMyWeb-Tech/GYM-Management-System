@@ -1,113 +1,95 @@
 // app/api/store/settings/route.js
 import prisma from '@/lib/prisma';
-import { getAuth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import authSeller from '@/middlewares/authSeller';
 import authAdmin from '@/middlewares/authAdmin';
-import verifyEmployeeToken, { hasPermission, PERMISSIONS } from '@/middlewares/authEmployee';
+import { getAuth } from '@clerk/nextjs/server';
+import { resolveBranchAccess } from '@/lib/resolveBranchAccess';
+import { PERMISSIONS } from '@/middlewares/authEmployee';
 
-// GET /api/store/settings — Fetch store settings
+const SETTINGS_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  username: true,
+  address: true,
+  phone: true,
+  email: true,
+  contact: true,
+  operatingHours: true,
+  gstNumber: true,
+  logo: true,
+  status: true,
+  isActive: true,
+  commission: { select: { percentage: true } },
+};
+
+// GET /api/store/settings — Fetch branch settings
 export async function GET(request) {
   try {
-    const { userId } = getAuth(request);
     const { searchParams } = new URL(request.url);
-    const queryStoreId = searchParams.get('storeId');
+    const queryBranchId = searchParams.get('branchId');
 
-    // Admin fetching any store's settings
-    if (queryStoreId) {
+    // Admin fetching any branch's settings
+    if (queryBranchId) {
+      const { userId } = getAuth(request);
+      if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
       const isAdminUser = await authAdmin(userId);
       if (!isAdminUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-      const store = await prisma.store.findUnique({
-        where: { id: queryStoreId },
-        select: {
-          id: true, name: true, description: true,
-          address: true, email: true, contact: true,
-          logo: true, status: true, isActive: true,
-          commission: { select: { percentage: true } },
-          shippingRules: true,
-        },
+      const branch = await prisma.branch.findUnique({
+        where: { id: queryBranchId },
+        select: SETTINGS_SELECT,
       });
-      if (!store) return NextResponse.json({ error: 'Store not found' }, { status: 404 });
-      return NextResponse.json({ settings: store });
+      if (!branch) return NextResponse.json({ error: 'Branch not found' }, { status: 404 });
+      return NextResponse.json({ settings: branch });
     }
 
-    // Employee fetching own store settings
-    const employee = verifyEmployeeToken(request);
-    if (employee) {
-      if (!hasPermission(employee, PERMISSIONS.MANAGE_STORE_SETTINGS)) {
-        return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
-      }
-      const store = await prisma.store.findUnique({
-        where: { id: employee.storeId },
-        select: {
-          id: true, name: true, description: true,
-          address: true, email: true, contact: true, logo: true,
-        },
-      });
-      return NextResponse.json({ settings: store });
-    }
+    // Owner or receptionist fetching their own branch's settings
+    const access = await resolveBranchAccess(request, PERMISSIONS.MANAGE_BRANCH_SETTINGS);
+    if (access.error) return NextResponse.json({ error: access.error }, { status: access.status });
 
-    // Store owner fetching own settings
-    if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-    const storeId = await authSeller(userId);
-    if (!storeId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        id: true, name: true, description: true,
-        address: true, email: true, contact: true,
-        logo: true, status: true, isActive: true,
-        commission: { select: { percentage: true } },
-        shippingRules: true,
-      },
+    const branch = await prisma.branch.findUnique({
+      where: { id: access.branchId },
+      select: SETTINGS_SELECT,
     });
+    if (!branch) return NextResponse.json({ error: 'Branch not found' }, { status: 404 });
 
-    return NextResponse.json({ settings: store });
+    return NextResponse.json({ settings: branch });
   } catch (error) {
     console.error('GET /api/store/settings error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// POST /api/store/settings — Update store settings (owner only)
+// POST /api/store/settings — Update branch settings
 export async function POST(request) {
   try {
-    // Block employees
-    const employee = verifyEmployeeToken(request);
-    if (employee) {
-      if (!hasPermission(employee, PERMISSIONS.MANAGE_STORE_SETTINGS)) {
-        return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
-      }
-    }
-
-    const { userId } = getAuth(request);
-    if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-
-    const storeId = await authSeller(userId);
-    if (!storeId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const access = await resolveBranchAccess(request, PERMISSIONS.MANAGE_BRANCH_SETTINGS);
+    if (access.error) return NextResponse.json({ error: access.error }, { status: access.status });
 
     const body = await request.json();
-    const { name, description, address, email, contact } = body;
+    const { name, description, address, phone, email, contact, operatingHours, gstNumber } = body;
 
-    if (!name || !email || !contact) {
-      return NextResponse.json({ error: 'Name, email and contact are required' }, { status: 400 });
+    if (!name || !email || !phone || !contact) {
+      return NextResponse.json(
+        { error: 'Name, email, phone and contact are required' },
+        { status: 400 }
+      );
     }
 
-    const updated = await prisma.store.update({
-      where: { id: storeId },
+    const updated = await prisma.branch.update({
+      where: { id: access.branchId },
       data: {
         name,
         description: description || '',
         address: address || '',
+        phone,
         email,
         contact,
+        operatingHours: operatingHours || null,
+        gstNumber: gstNumber || null,
       },
-      select: {
-        id: true, name: true, description: true,
-        address: true, email: true, contact: true, logo: true,
-      },
+      select: SETTINGS_SELECT,
     });
 
     return NextResponse.json({ message: 'Settings updated successfully', settings: updated });

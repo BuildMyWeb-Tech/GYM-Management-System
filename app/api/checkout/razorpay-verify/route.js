@@ -37,29 +37,32 @@ export async function POST(request) {
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     if (order.isPaid) return NextResponse.json({ message: 'Order already confirmed', order });
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const updatedOrder = await tx.order.update({
-        where: { id: orderId },
-        data: { isPaid: true, status: 'CONFIRMED', paymentRef: razorpay_payment_id },
-      });
+    const updated = await prisma.$transaction(
+      async (tx) => {
+        const updatedOrder = await tx.order.update({
+          where: { id: orderId },
+          data: { isPaid: true, status: 'CONFIRMED', paymentRef: razorpay_payment_id },
+        });
 
-      await tx.orderTimeline.create({
-        data: {
-          orderId,
-          status: 'CONFIRMED',
-          changedBy: access.isOwner ? 'owner' : access.employee.employeeId,
-          note: 'Payment verified via Razorpay',
-        },
-      });
+        await tx.orderTimeline.create({
+          data: {
+            orderId,
+            status: 'CONFIRMED',
+            changedBy: access.isOwner ? 'owner' : access.employee.employeeId,
+            note: 'Payment verified via Razorpay',
+          },
+        });
 
-      await activateMembershipsForOrder(
-        tx,
-        { branchId, memberId: order.memberId },
-        order.orderItems
-      );
+        await activateMembershipsForOrder(
+          tx,
+          { branchId, memberId: order.memberId },
+          order.orderItems
+        );
 
-      return updatedOrder;
-    });
+        return updatedOrder;
+      },
+      { maxWait: 10000, timeout: 15000 }
+    );
 
     return NextResponse.json({ message: 'Payment verified, order confirmed', order: updated });
   } catch (error) {

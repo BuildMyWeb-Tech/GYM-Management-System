@@ -1,9 +1,13 @@
 // app/api/member/create/route.js
 import prisma from '@/lib/prisma';
-import imagekit from '@/configs/imageKit';
 import { resolveBranchAccess } from '@/lib/resolveBranchAccess';
 import { PERMISSIONS } from '@/middlewares/authEmployee';
 import { NextResponse } from 'next/server';
+
+function last5Digits(phone) {
+  const digits = (phone || '').replace(/\D/g, '');
+  return digits.slice(-5);
+}
 
 export async function POST(request) {
   try {
@@ -11,62 +15,78 @@ export async function POST(request) {
     if (access.error) return NextResponse.json({ error: access.error }, { status: access.status });
     const { branchId } = access;
 
-    const formData = await request.formData();
-    const fullName = formData.get('fullName');
-    const phone = formData.get('phone');
-    const dob = formData.get('dob') || null;
-    const gender = formData.get('gender') || null;
-    const address = formData.get('address') || null;
-    const emergencyContactName = formData.get('emergencyContactName');
-    const emergencyContactNumber = formData.get('emergencyContactNumber');
-    const deviceUserId = formData.get('deviceUserId') || null;
-    const photoFile = formData.get('photo');
+    const body = await request.json();
+    const {
+      fullName, phone, dob, gender, address,
+      emergencyContactName, emergencyContactNumber, deviceUserId,
+      memberCode, planIds, fromDate,
+    } = body;
 
-    if (!fullName || !phone || !emergencyContactName || !emergencyContactNumber || !photoFile) {
+    if (!fullName || !phone || !emergencyContactName || !emergencyContactNumber) {
       return NextResponse.json(
-        { error: 'Full name, phone, emergency contact, and photo are required' },
+        { error: 'Full name, phone, and emergency contact are required' },
         { status: 400 }
       );
     }
 
-    // Upload photo to ImageKit
-    const buffer = Buffer.from(await photoFile.arrayBuffer());
-    const uploadResponse = await imagekit.upload({
-      file: buffer,
-      fileName: photoFile.name,
-      folder: 'members',
-    });
-    const photo = imagekit.url({
-      path: uploadResponse.filePath,
-      transformation: [{ quality: 'auto' }, { format: 'webp' }, { width: '256' }],
+    const finalMemberCode = (memberCode || '').trim() || last5Digits(phone);
+    const startDate = fromDate ? new Date(fromDate) : new Date();
+
+    // Validate selected plans belong to this branch, and pull real durations/prices server-side
+    let plans = [];
+    if (Array.isArray(planIds) && planIds.length > 0) {
+      plans = await prisma.membershipPlan.findMany({
+        where: { id: { in: planIds }, branchId, status: 'ACTIVE' },
+      });
+      if (plans.length !== planIds.length) {
+        return NextResponse.json({ error: 'One or more selected plans are invalid or inactive' }, { status: 400 });
+      }
+    }
+
+    const member = await prisma.$transaction(async (tx) => {
+      const created = await tx.member.create({
+        data: {
+          branchId,
+          memberCode: finalMemberCode || null,
+          fullName,
+          phone,
+          dob: dob ? new Date(dob) : null,
+          gender: gender || null,
+          address: address || null,
+          emergencyContactName,
+          emergencyContactNumber,
+          deviceUserId: deviceUserId || null,
+          status: 'ACTIVE',
+        },
+      });
+
+      for (const plan of plans) {
+        const expiryDate = new Date(startDate);
+        expiryDate.setDate(expiryDate.getDate() + plan.durationDays);
+
+        await tx.membership.create({
+          data: {
+            memberId: created.id,
+            planId: plan.id,
+            branchId,
+            startDate,
+            expiryDate,
+            status: 'ACTIVE',
+          },
+        });
+      }
+
+      return created;
     });
 
-    const member = await prisma.member.create({
-      data: {
-        branchId,
-        fullName,
-        phone,
-        photo,
-        dob: dob ? new Date(dob) : null,
-        gender,
-        address,
-        emergencyContactName,
-        emergencyContactNumber,
-        deviceUserId,
-        status: 'ACTIVE',
-      },
-    });
-
-    return NextResponse.json(
-      { message: 'Member registered successfully', member },
-      { status: 201 }
-    );
+    return NextResponse.json({ message: 'Member registered successfully', member }, { status: 201 });
   } catch (error) {
     if (error.code === 'P2002') {
-      return NextResponse.json(
-        { error: 'That biometric device ID is already assigned to another member in this branch' },
-        { status: 400 }
-      );
+      const target = error.meta?.target || [];
+      if (target.includes('memberCode')) {
+        return NextResponse.json({ error: 'That Member ID is already in use in this branch — enter a different one' }, { status: 400 });
+      }
+      return NextResponse.json({ error: 'That biometric device ID is already assigned to another member in this branch' }, { status: 400 });
     }
     console.error('POST /api/member/create error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

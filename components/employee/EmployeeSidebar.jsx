@@ -35,7 +35,7 @@ const ALL_LINKS = [
     permission: PERMISSIONS.COLLECT_PAYMENT,
   },
   {
-    name: 'Orders',
+    name: 'Payments',
     href: '/employee/orders',
     icon: ShoppingBag,
     permission: PERMISSIONS.COLLECT_PAYMENT,

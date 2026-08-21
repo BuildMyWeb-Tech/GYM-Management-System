@@ -112,7 +112,7 @@ model PlanCategory {
 model MembershipPlan {
   id            String        @id @default(cuid())
   branchId      String
-  categoryId    String
+  categoryId    String?
   name          String
   slug          String
   description   String
@@ -125,7 +125,7 @@ model MembershipPlan {
   updatedAt     DateTime      @updatedAt
 
   branch        Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  category      PlanCategory  @relation(fields: [categoryId], references: [id])
+  category      PlanCategory? @relation(fields: [categoryId], references: [id])
   memberships   Membership[]
   orderItems    OrderItem[]
 
@@ -159,6 +159,7 @@ model Member {
   id                     String    @id @default(cuid())
   userId                 String?   @unique
   branchId               String
+  memberCode             String?
   fullName               String
   phone                  String
   photo                  String?
@@ -181,11 +182,11 @@ model Member {
   notifications NotificationLog[]
 
   @@unique([branchId, deviceUserId])
+  @@unique([branchId, memberCode])
   @@index([branchId])
   @@index([phone])
   @@index([status])
 }
-
 // ─── MEMBERSHIP (the subscription instance) ────────────────────────────────────
 
 model Membership {

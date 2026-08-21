@@ -23,16 +23,52 @@ import { useState } from 'react';
 import { PERMISSIONS } from '@/middlewares/authEmployee';
 
 const ALL_LINKS = [
-  { name: 'Dashboard',      href: '/store',            icon: HomeIcon,       permission: null },
-  { name: 'Members',        href: '/store/members',    icon: Users,          permission: PERMISSIONS.MANAGE_MEMBERS },
-  { name: 'Attendance',     href: '/store/attendance', icon: CalendarCheck,  permission: PERMISSIONS.MARK_ATTENDANCE },
-  { name: 'Plans',          href: '/store/plans',      icon: LayoutListIcon, permission: PERMISSIONS.MANAGE_MEMBERSHIPS },
-  { name: 'Checkout',       href: '/store/checkout',   icon: CreditCard,     permission: PERMISSIONS.COLLECT_PAYMENT },
-  { name: 'Orders',         href: '/store/orders',     icon: ShoppingBag,    permission: PERMISSIONS.COLLECT_PAYMENT },
-  { name: 'Reports',        href: '/store/analytics',  icon: BarChart2,      permission: PERMISSIONS.VIEW_REPORTS },
-  { name: 'Receptionists',  href: '/store/employees',  icon: UserCog,        permission: null, ownerOnly: true },
-  { name: 'Devices',        href: '/store/devices',    icon: Fingerprint,    permission: null, ownerOnly: true },
-  { name: 'Branch Settings',href: '/store/settings',   icon: Settings,       permission: PERMISSIONS.MANAGE_BRANCH_SETTINGS },
+  { name: 'Dashboard', href: '/store', icon: HomeIcon, permission: null },
+  { name: 'Members', href: '/store/members', icon: Users, permission: PERMISSIONS.MANAGE_MEMBERS },
+  {
+    name: 'Attendance',
+    href: '/store/attendance',
+    icon: CalendarCheck,
+    permission: PERMISSIONS.MARK_ATTENDANCE,
+  },
+  {
+    name: 'Plans',
+    href: '/store/plans',
+    icon: LayoutListIcon,
+    permission: PERMISSIONS.MANAGE_MEMBERSHIPS,
+  },
+  {
+    name: 'Checkout',
+    href: '/store/checkout',
+    icon: CreditCard,
+    permission: PERMISSIONS.COLLECT_PAYMENT,
+  },
+  {
+    name: 'Payments',
+    href: '/store/orders',
+    icon: ShoppingBag,
+    permission: PERMISSIONS.COLLECT_PAYMENT,
+  },
+  {
+    name: 'Reports',
+    href: '/store/analytics',
+    icon: BarChart2,
+    permission: PERMISSIONS.VIEW_REPORTS,
+  },
+  {
+    name: 'Receptionists',
+    href: '/store/employees',
+    icon: UserCog,
+    permission: null,
+    ownerOnly: true,
+  },
+  { name: 'Devices', href: '/store/devices', icon: Fingerprint, permission: null, ownerOnly: true },
+  {
+    name: 'Branch Settings',
+    href: '/store/settings',
+    icon: Settings,
+    permission: PERMISSIONS.MANAGE_BRANCH_SETTINGS,
+  },
 ];
 
 const StoreSidebar = ({ branchInfo, closeMobileMenu, employee }) => {

@@ -6,18 +6,13 @@ import {
   LayoutDashboard,
   Building2,
   CheckSquare,
-  Layers,
   BarChart2,
-  ShoppingBag,
 } from 'lucide-react';
 
 const navLinks = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { label: 'Branches', href: '/admin/stores', icon: Building2 },
   { label: 'Approve', href: '/admin/approve', icon: CheckSquare },
-  { label: 'Categories', href: '/admin/categories', icon: Layers },
-  { label: 'Orders', href: '/admin/orders', icon: ShoppingBag },
-  { label: 'Coupons', href: '/admin/coupons', icon: BarChart2 },
   { label: 'Sales Report', href: '/admin/sales-report', icon: BarChart2 },
 ];
 

@@ -5,18 +5,16 @@ import { useAuth } from '@clerk/nextjs';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { getBranchAuthHeader } from '@/lib/authHeader';
+import { generateReportPdf } from '@/lib/generateReportPdf';
 import Loading from '@/components/Loading';
 import {
   IndianRupee,
-  Users,
   CalendarCheck,
   TrendingUp,
-  Download,
+  FileText,
   RefreshCcw,
   UserCheck,
   UserX,
-  Snowflake,
-  UserPlus,
 } from 'lucide-react';
 import {
   LineChart,
@@ -72,6 +70,8 @@ export default function ReportsDashboard({ isAdmin = false }) {
   const [topAttendees, setTopAttendees] = useState([]);
   const [branches, setBranches] = useState([]);
   const [branchFilter, setBranchFilter] = useState('');
+  const [branchInfo, setBranchInfo] = useState(null);
+  const [exportingType, setExportingType] = useState(null);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -85,6 +85,18 @@ export default function ReportsDashboard({ isAdmin = false }) {
       }
     })();
   }, [isAdmin]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const headers = await getBranchAuthHeader(getToken);
+        const { data } = await axios.get('/api/store/settings', { headers });
+        setBranchInfo(data.settings);
+      } catch {
+        /* non-fatal, PDF header just falls back gracefully */
+      }
+    })();
+  }, []);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -113,29 +125,28 @@ export default function ReportsDashboard({ isAdmin = false }) {
     fetchAll();
   }, [fetchAll]);
 
-  const exportReport = async (type) => {
+  const exportPDF = async (type) => {
     try {
+      setExportingType(type);
       const headers = await getBranchAuthHeader(getToken);
       const params = {
         period,
         type,
-        format: 'csv',
+        format: 'pdf',
         ...(branchFilter ? { branchId: branchFilter } : {}),
       };
-      const response = await axios.get('/api/reports/export', {
-        headers,
-        params,
-        responseType: 'blob',
+      const { data } = await axios.get('/api/reports/export', { headers, params });
+      await generateReportPdf({
+        branch: data.branch || branchInfo,
+        type,
+        period,
+        rows: data.rows,
+        summary: data.summary,
       });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${type}-report-${period}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
     } catch (error) {
-      toast.error('Export failed');
+      toast.error('PDF export failed');
+    } finally {
+      setExportingType(null);
     }
   };
 
@@ -178,7 +189,6 @@ export default function ReportsDashboard({ isAdmin = false }) {
         </div>
       </div>
 
-      {/* Revenue stat row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         <StatCard
           title="Revenue"
@@ -186,11 +196,10 @@ export default function ReportsDashboard({ isAdmin = false }) {
           icon={IndianRupee}
           color="green"
         />
-        <StatCard title="Orders" value={summary.orders} icon={TrendingUp} color="blue" />
         <StatCard
-          title="Avg. Order Value"
+          title="Avg. Payment Value"
           value={`₹${summary.aov.toLocaleString('en-IN')}`}
-          icon={IndianRupee}
+          icon={TrendingUp}
           color="purple"
         />
         <StatCard
@@ -199,10 +208,6 @@ export default function ReportsDashboard({ isAdmin = false }) {
           icon={CalendarCheck}
           color="amber"
         />
-      </div>
-
-      {/* Member stat row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard
           title="Active Members"
           value={summary.activeMembers}
@@ -210,13 +215,6 @@ export default function ReportsDashboard({ isAdmin = false }) {
           color="green"
         />
         <StatCard title="Expired Members" value={summary.expiredMembers} icon={UserX} color="red" />
-        <StatCard title="New This Period" value={summary.newMembers} icon={UserPlus} color="blue" />
-        <StatCard
-          title="Commission Paid"
-          value={`₹${summary.commissionEarned.toLocaleString('en-IN')}`}
-          icon={IndianRupee}
-          color="slate"
-        />
       </div>
 
       {summary.topBranch && (
@@ -228,7 +226,6 @@ export default function ReportsDashboard({ isAdmin = false }) {
         </div>
       )}
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
           <h3 className="font-semibold text-slate-800 mb-4">Revenue Trend</h3>
@@ -275,7 +272,6 @@ export default function ReportsDashboard({ isAdmin = false }) {
         </div>
       </div>
 
-      {/* Top attendees */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-5 border-b border-slate-100">
           <h3 className="font-semibold text-slate-800">Most Frequent Members (This Period)</h3>
@@ -298,19 +294,30 @@ export default function ReportsDashboard({ isAdmin = false }) {
         )}
       </div>
 
-      {/* Exports */}
       <div className="flex flex-wrap gap-3">
         <button
-          onClick={() => exportReport('orders')}
-          className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-medium"
+          onClick={() => exportPDF('orders')}
+          disabled={exportingType === 'orders'}
+          className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-60"
         >
-          <Download size={15} /> Export Revenue (CSV)
+          {exportingType === 'orders' ? (
+            <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+          ) : (
+            <FileText size={15} />
+          )}
+          {exportingType === 'orders' ? 'Generating...' : 'Download Revenue PDF'}
         </button>
         <button
-          onClick={() => exportReport('attendance')}
-          className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-medium"
+          onClick={() => exportPDF('attendance')}
+          disabled={exportingType === 'attendance'}
+          className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-60"
         >
-          <Download size={15} /> Export Attendance (CSV)
+          {exportingType === 'attendance' ? (
+            <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+          ) : (
+            <FileText size={15} />
+          )}
+          {exportingType === 'attendance' ? 'Generating...' : 'Download Attendance PDF'}
         </button>
       </div>
     </div>

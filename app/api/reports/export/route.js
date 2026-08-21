@@ -23,7 +23,7 @@ export async function GET(request) {
     if (!role) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type') || 'orders'; // orders | attendance
+    const type = searchParams.get('type') || 'orders';
     const format = searchParams.get('format') || 'csv';
     const period = searchParams.get('period') || 'month';
     const from = searchParams.get('from');
@@ -38,6 +38,14 @@ export async function GET(request) {
       );
 
     const scopedBranchId = role === 'ADMIN' ? filterBranch || undefined : myBranchId;
+
+    let branchInfo = null;
+    if (scopedBranchId) {
+      branchInfo = await prisma.branch.findUnique({
+        where: { id: scopedBranchId },
+        select: { name: true, address: true, phone: true },
+      });
+    }
 
     if (type === 'attendance') {
       const records = await prisma.attendance.findMany({
@@ -76,13 +84,15 @@ export async function GET(request) {
       }
       return NextResponse.json({
         format: 'pdf',
+        type: 'attendance',
+        branch: branchInfo,
+        period,
         rows,
         columns,
         generatedAt: new Date().toISOString(),
       });
     }
 
-    // type === 'orders'
     const orders = await prisma.order.findMany({
       where: {
         createdAt: dateRange,
@@ -142,6 +152,8 @@ export async function GET(request) {
 
     return NextResponse.json({
       format: 'pdf',
+      type: 'revenue',
+      branch: branchInfo,
       summary: {
         totalRevenue,
         totalCommission,

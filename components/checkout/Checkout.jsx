@@ -5,40 +5,32 @@ import { useAuth } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import Script from 'next/script';
 import { getBranchAuthHeader } from '@/lib/authHeader';
 import Loading from '@/components/Loading';
-import { Search, Plus, Minus, Trash2, Tag, CreditCard, ShoppingCart } from 'lucide-react';
+import { Search, Check, Plus, Trash2, CreditCard, ShoppingCart } from 'lucide-react';
 
 export default function Checkout({ basePath }) {
   const { getToken } = useAuth();
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-  const [members, setMembers] = useState([]);
   const [plans, setPlans] = useState([]);
-  const [packages, setPackages] = useState([]);
+  const [members, setMembers] = useState([]);
   const [memberSearch, setMemberSearch] = useState('');
   const [selectedMember, setSelectedMember] = useState(null);
   const [cart, setCart] = useState([]);
-  const [couponCode, setCouponCode] = useState('');
-  const [couponDiscount, setCouponDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [submitting, setSubmitting] = useState(false);
-
-  const [supplementName, setSupplementName] = useState('');
-  const [supplementPrice, setSupplementPrice] = useState('');
 
   useEffect(() => {
     (async () => {
       try {
         const headers = await getBranchAuthHeader(getToken);
-        const [planRes, pkgRes] = await Promise.all([
-          axios.get('/api/membership-plan', { headers, params: { status: 'ACTIVE' } }),
-          axios.get('/api/pt-package', { headers }),
-        ]);
-        setPlans(planRes.data.plans);
-        setPackages(pkgRes.data.packages.filter((p) => p.isActive));
+        const { data } = await axios.get('/api/membership-plan', {
+          headers,
+          params: { status: 'ACTIVE' },
+        });
+        setPlans(data.plans);
       } catch (error) {
         toast.error(error?.response?.data?.error || error.message);
       } finally {
@@ -63,75 +55,32 @@ export default function Checkout({ basePath }) {
     return () => clearTimeout(t);
   }, [memberSearch]);
 
-  const addToCart = (itemType, item) => {
-    setCart((prev) => {
-      if (
-        itemType === 'MEMBERSHIP_PLAN' &&
-        prev.some((c) => c.itemType === 'MEMBERSHIP_PLAN' && c.refId === item.id)
-      ) {
-        toast('That plan is already in the cart', { icon: 'ℹ️' });
-        return prev;
-      }
-      return [
+  const isPlanSelected = (planId) =>
+    cart.some((c) => c.itemType === 'MEMBERSHIP_PLAN' && c.refId === planId);
+
+  const togglePlan = (plan) => {
+    if (isPlanSelected(plan.id)) {
+      setCart((prev) =>
+        prev.filter((c) => !(c.itemType === 'MEMBERSHIP_PLAN' && c.refId === plan.id))
+      );
+    } else {
+      setCart((prev) => [
         ...prev,
         {
-          key: `${itemType}-${item.id || Date.now()}`,
-          itemType,
-          refId: item.id,
-          name: item.name,
-          price: item.price,
+          key: `MEMBERSHIP_PLAN-${plan.id}`,
+          itemType: 'MEMBERSHIP_PLAN',
+          refId: plan.id,
+          name: plan.name,
+          price: plan.price,
           quantity: 1,
         },
-      ];
-    });
-  };
-
-  const addSupplement = () => {
-    if (!supplementName || !supplementPrice) {
-      toast.error('Enter a name and price');
-      return;
+      ]);
     }
-    setCart((prev) => [
-      ...prev,
-      {
-        key: `SUPPLEMENT-${Date.now()}`,
-        itemType: 'SUPPLEMENT',
-        name: supplementName,
-        price: Number(supplementPrice),
-        quantity: 1,
-      },
-    ]);
-    setSupplementName('');
-    setSupplementPrice('');
-  };
-
-  const updateQty = (key, delta) => {
-    setCart((prev) =>
-      prev.map((c) => (c.key === key ? { ...c, quantity: Math.max(1, c.quantity + delta) } : c))
-    );
   };
 
   const removeFromCart = (key) => setCart((prev) => prev.filter((c) => c.key !== key));
 
-  const subtotal = cart.reduce((s, c) => s + c.price * c.quantity, 0);
-  const total = Math.max(0, subtotal - couponDiscount);
-
-  const applyCoupon = async () => {
-    if (!couponCode || !selectedMember) return;
-    try {
-      const headers = await getBranchAuthHeader(getToken);
-      const { data } = await axios.post(
-        '/api/coupon/validate',
-        { code: couponCode, memberId: selectedMember.id, subtotal },
-        { headers }
-      );
-      setCouponDiscount(data.couponDiscount);
-      toast.success(`Coupon applied — ₹${data.couponDiscount} off`);
-    } catch (error) {
-      setCouponDiscount(0);
-      toast.error(error?.response?.data?.error || error.message);
-    }
-  };
+  const total = cart.reduce((s, c) => s + c.price * c.quantity, 0);
 
   const loadRazorpayScript = () =>
     new Promise((resolve) => {
@@ -149,7 +98,7 @@ export default function Checkout({ basePath }) {
       return;
     }
     if (cart.length === 0) {
-      toast.error('Cart is empty');
+      toast.error('Select at least one plan');
       return;
     }
 
@@ -165,7 +114,7 @@ export default function Checkout({ basePath }) {
           price: c.price,
           quantity: c.quantity,
         })),
-        couponCode: couponDiscount > 0 ? couponCode : null,
+        couponCode: null,
         paymentMethod,
       };
       const { data } = await axios.post('/api/checkout/create', payload, { headers });
@@ -248,16 +197,16 @@ export default function Checkout({ basePath }) {
               <div className="relative">
                 <Search
                   size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"
                 />
                 <input
                   value={memberSearch}
                   onChange={(e) => setMemberSearch(e.target.value)}
                   placeholder="Search member by name or phone..."
-                  className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-100"
+                  className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-100 focus:border-green-400"
                 />
                 {members.length > 0 && (
-                  <div className="mt-2 border border-slate-200 rounded-lg overflow-hidden divide-y divide-slate-100">
+                  <div className="absolute left-0 right-0 top-full mt-2 z-20 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden divide-y divide-slate-100 max-h-64 overflow-y-auto">
                     {members.map((m) => (
                       <button
                         key={m.id}
@@ -266,10 +215,10 @@ export default function Checkout({ basePath }) {
                           setMemberSearch('');
                           setMembers([]);
                         }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm"
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm flex items-center justify-between"
                       >
                         <span className="font-medium text-slate-800">{m.fullName}</span>
-                        <span className="text-slate-400 ml-2">{m.phone}</span>
+                        <span className="text-slate-400">{m.phone}</span>
                       </button>
                     ))}
                   </div>
@@ -278,65 +227,34 @@ export default function Checkout({ basePath }) {
             )}
           </div>
 
-          {/* Item picker */}
+          {/* Plan picker */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-            <h3 className="font-semibold text-slate-800 mb-3">2. Add Items</h3>
-            <p className="text-xs text-slate-500 mb-2 font-medium">Membership Plans</p>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {plans.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => addToCart('MEMBERSHIP_PLAN', p)}
-                  className="text-xs border border-slate-200 hover:border-green-400 hover:bg-green-50 rounded-lg px-3 py-2 flex items-center gap-1.5"
-                >
-                  <Plus size={12} /> {p.name} — ₹{p.price.toLocaleString('en-IN')}
-                </button>
-              ))}
-              {plans.length === 0 && (
-                <p className="text-xs text-slate-400">
-                  No active plans — add one under Plans first
-                </p>
-              )}
-            </div>
-
-            <p className="text-xs text-slate-500 mb-2 font-medium">PT Packages</p>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {packages.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => addToCart('PT_PACKAGE', p)}
-                  className="text-xs border border-slate-200 hover:border-blue-400 hover:bg-blue-50 rounded-lg px-3 py-2 flex items-center gap-1.5"
-                >
-                  <Plus size={12} /> {p.name} — ₹{p.price.toLocaleString('en-IN')}
-                </button>
-              ))}
-              {packages.length === 0 && (
-                <p className="text-xs text-slate-400">No PT packages set up yet</p>
-              )}
-            </div>
-
-            <p className="text-xs text-slate-500 mb-2 font-medium">Custom / Supplement Item</p>
-            <div className="flex gap-2">
-              <input
-                value={supplementName}
-                onChange={(e) => setSupplementName(e.target.value)}
-                placeholder="Item name"
-                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-100"
-              />
-              <input
-                value={supplementPrice}
-                onChange={(e) => setSupplementPrice(e.target.value)}
-                placeholder="₹"
-                type="number"
-                className="w-24 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-100"
-              />
-              <button
-                onClick={addSupplement}
-                className="bg-slate-100 hover:bg-slate-200 px-3 rounded-lg"
-              >
-                <Plus size={16} />
-              </button>
-            </div>
+            <h3 className="font-semibold text-slate-800 mb-3">2. Select Plan(s)</h3>
+            {plans.length === 0 ? (
+              <p className="text-sm text-slate-400">
+                No active plans — add one from the Plans page first
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {plans.map((p) => {
+                  const selected = isPlanSelected(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => togglePlan(p)}
+                      className={`text-sm rounded-lg px-3.5 py-2.5 flex items-center gap-2 border transition-colors ${
+                        selected
+                          ? 'bg-green-600 border-green-600 text-white'
+                          : 'border-slate-200 text-slate-700 hover:border-green-400 hover:bg-green-50'
+                      }`}
+                    >
+                      {selected ? <Check size={14} /> : <Plus size={14} />}
+                      {p.name} — ₹{p.price.toLocaleString('en-IN')}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -344,7 +262,7 @@ export default function Checkout({ basePath }) {
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 h-fit lg:sticky lg:top-6">
           <h3 className="font-semibold text-slate-800 mb-3">Cart</h3>
           {cart.length === 0 ? (
-            <p className="text-sm text-slate-400 py-8 text-center">No items yet</p>
+            <p className="text-sm text-slate-400 py-8 text-center">No plans selected yet</p>
           ) : (
             <div className="space-y-2 mb-4">
               {cart.map((c) => (
@@ -354,70 +272,21 @@ export default function Checkout({ basePath }) {
                 >
                   <div className="flex-1 min-w-0">
                     <p className="truncate text-slate-700">{c.name}</p>
-                    <p className="text-xs text-slate-400">
-                      ₹{c.price.toLocaleString('en-IN')} × {c.quantity}
-                    </p>
+                    <p className="text-xs text-slate-400">₹{c.price.toLocaleString('en-IN')}</p>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {c.itemType === 'SUPPLEMENT' && (
-                      <>
-                        <button
-                          onClick={() => updateQty(c.key, -1)}
-                          className="p-1 hover:bg-slate-100 rounded"
-                        >
-                          <Minus size={12} />
-                        </button>
-                        <span className="text-xs w-4 text-center">{c.quantity}</span>
-                        <button
-                          onClick={() => updateQty(c.key, 1)}
-                          className="p-1 hover:bg-slate-100 rounded"
-                        >
-                          <Plus size={12} />
-                        </button>
-                      </>
-                    )}
-                    <button
-                      onClick={() => removeFromCart(c.key)}
-                      className="p-1 hover:bg-red-50 text-red-500 rounded"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => removeFromCart(c.key)}
+                    className="p-1 hover:bg-red-50 text-red-500 rounded"
+                  >
+                    <Trash2 size={12} />
+                  </button>
                 </div>
               ))}
             </div>
           )}
 
-          <div className="flex gap-2 mb-3">
-            <div className="relative flex-1">
-              <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value)}
-                placeholder="Coupon code"
-                className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-green-100"
-              />
-            </div>
-            <button
-              onClick={applyCoupon}
-              className="text-xs bg-slate-100 hover:bg-slate-200 px-3 rounded-lg"
-            >
-              Apply
-            </button>
-          </div>
-
           <div className="space-y-1 text-sm border-t border-slate-100 pt-3">
-            <div className="flex justify-between text-slate-500">
-              <span>Subtotal</span>
-              <span>₹{subtotal.toLocaleString('en-IN')}</span>
-            </div>
-            {couponDiscount > 0 && (
-              <div className="flex justify-between text-green-600">
-                <span>Coupon</span>
-                <span>-₹{couponDiscount.toLocaleString('en-IN')}</span>
-              </div>
-            )}
-            <div className="flex justify-between font-bold text-slate-800 text-base pt-1">
+            <div className="flex justify-between font-bold text-slate-800 text-base">
               <span>Total</span>
               <span>₹{total.toLocaleString('en-IN')}</span>
             </div>

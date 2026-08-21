@@ -15,7 +15,6 @@ async function resolveBranchAuth(request) {
   return { branchId, source: 'owner' };
 }
 
-// GET /api/store/dashboard
 export async function GET(request) {
   try {
     const { branchId } = await resolveBranchAuth(request);
@@ -23,6 +22,10 @@ export async function GET(request) {
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
+
+    const in3Days = new Date();
+    in3Days.setDate(in3Days.getDate() + 3);
+    in3Days.setHours(23, 59, 59, 999);
 
     const [
       branch,
@@ -33,6 +36,7 @@ export async function GET(request) {
       todayAttendance,
       totalOrders,
       revenueAgg,
+      expiringSoon,
     ] = await Promise.all([
       prisma.branch.findUnique({
         where: { id: branchId },
@@ -44,9 +48,19 @@ export async function GET(request) {
       prisma.employee.count({ where: { branchId } }),
       prisma.attendance.count({ where: { branchId, checkIn: { gte: todayStart } } }),
       prisma.order.count({ where: { branchId } }),
-      prisma.order.aggregate({
-        where: { branchId, isPaid: true },
-        _sum: { total: true },
+      prisma.order.aggregate({ where: { branchId, isPaid: true }, _sum: { total: true } }),
+      prisma.membership.findMany({
+        where: {
+          branchId,
+          status: 'ACTIVE',
+          expiryDate: { gte: todayStart, lte: in3Days },
+        },
+        include: {
+          member: { select: { fullName: true, phone: true } },
+          plan: { select: { name: true } },
+        },
+        orderBy: { expiryDate: 'asc' },
+        take: 25,
       }),
     ]);
 
@@ -60,6 +74,12 @@ export async function GET(request) {
         todayAttendance,
         totalOrders,
         totalRevenue: revenueAgg._sum.total || 0,
+        expiringSoon: expiringSoon.map((m) => ({
+          memberName: m.member.fullName,
+          phone: m.member.phone,
+          planName: m.plan.name,
+          expiryDate: m.expiryDate,
+        })),
       },
     });
   } catch (error) {

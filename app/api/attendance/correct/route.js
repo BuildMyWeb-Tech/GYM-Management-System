@@ -11,15 +11,16 @@ export async function PUT(request) {
     const { branchId } = access;
 
     const { id, checkIn, checkOut, correctionReason } = await request.json();
-    if (!id || !correctionReason) {
-      return NextResponse.json({ error: 'id and correctionReason are required' }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 });
     }
 
     const existing = await prisma.attendance.findFirst({ where: { id, branchId } });
     if (!existing)
       return NextResponse.json({ error: 'Attendance record not found' }, { status: 404 });
 
-    const updateData = { correctionReason, method: 'MANUAL' };
+    const updateData = { method: 'MANUAL' };
+    if (correctionReason) updateData.correctionReason = correctionReason;
     if (checkIn) updateData.checkIn = new Date(checkIn);
     if (checkOut !== undefined) updateData.checkOut = checkOut ? new Date(checkOut) : null;
     if (!access.isOwner) updateData.correctedById = access.employee.employeeId;

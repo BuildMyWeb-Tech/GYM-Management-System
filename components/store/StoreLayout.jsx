@@ -128,12 +128,7 @@ const StoreLayout = ({ children }) => {
           </div>
           <div className="flex-1 h-full overflow-y-auto hide-scrollbar bg-slate-50 relative">
             <div className="relative z-10">{children}</div>
-            <div className="pb-4 text-center text-xs text-slate-400 relative z-10">
-              <p>
-                © {new Date().getFullYear()} {branchInfo?.name || 'Branch Dashboard'} • All Rights
-                Reserved
-              </p>
-            </div>
+            
           </div>
         </div>
       </div>

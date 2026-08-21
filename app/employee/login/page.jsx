@@ -52,7 +52,6 @@ export default function EmployeeLoginPage() {
           >
             <span className="text-blue-600">Gym</span>Desk
           </Link>
-          <p className="text-slate-500 text-sm mt-2">Receptionist Portal</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8">
@@ -61,9 +60,7 @@ export default function EmployeeLoginPage() {
               <Users size={26} className="text-blue-600" />
             </div>
             <h1 className="text-xl font-bold text-slate-800">Receptionist Login</h1>
-            <p className="text-slate-400 text-sm mt-1">
-              Sign in with your receptionist credentials
-            </p>
+            
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

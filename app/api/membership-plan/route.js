@@ -14,7 +14,6 @@ export async function GET(request) {
 
     const plans = await prisma.membershipPlan.findMany({
       where: { branchId: access.branchId, ...(status !== 'ALL' ? { status } : {}) },
-      include: { category: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -30,32 +29,26 @@ export async function POST(request) {
     const access = await resolveBranchAccess(request, PERMISSIONS.MANAGE_MEMBERSHIPS);
     if (access.error) return NextResponse.json({ error: access.error }, { status: access.status });
 
-    const { name, description, categoryId, durationDays, price, features } = await request.json();
+    const { name, durationDays, price } = await request.json();
 
-    if (!name || !categoryId || !durationDays || !price) {
+    if (!name || !durationDays || !price) {
       return NextResponse.json(
-        { error: 'Name, category, duration, and price are required' },
+        { error: 'Name, duration, and price are required' },
         { status: 400 }
       );
     }
-
-    const category = await prisma.planCategory.findFirst({
-      where: { id: categoryId, OR: [{ branchId: access.branchId }, { isGlobal: true }] },
-    });
-    if (!category) return NextResponse.json({ error: 'Category not found' }, { status: 404 });
 
     const slug = name.toLowerCase().trim().replace(/\s+/g, '-');
 
     const plan = await prisma.membershipPlan.create({
       data: {
         branchId: access.branchId,
-        categoryId,
         name,
         slug,
-        description: description || '',
+        description: '',
         durationDays: Number(durationDays),
         price: Number(price),
-        features: Array.isArray(features) ? features.filter(Boolean) : [],
+        features: [],
         createdBy: access.isOwner ? 'owner' : access.employee.employeeId,
         status: 'ACTIVE',
       },
