@@ -20,7 +20,7 @@ const AdminNavbar = ({ setSidebarOpen, sidebarOpen }) => {
                 </button>
                 
                 <Link href="/admin" className="relative text-2xl md:text-3xl font-semibold text-slate-800">
-                    <span className="text-green-600">King</span>cart<span className="text-green-600 text-4xl leading-0">.</span>
+                    <span className="text-green-600">Gym</span>Desk<span className="text-green-600 text-4xl leading-0">.</span>
                     <div className="absolute text-xs font-semibold -top-1 -right-13 px-2 py-0.5 rounded-full flex items-center gap-2 text-white bg-green-600">
                         Admin
                     </div>

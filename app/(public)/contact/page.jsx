@@ -46,7 +46,7 @@ export default function ContactPage() {
                             </div>
                             <div>
                                 <p className="text-sm font-medium text-slate-700">Email</p>
-                                <p className="text-sm text-slate-500 mt-0.5">support@kingcart.com</p>
+                                <p className="text-sm text-slate-500 mt-0.5">support@gymdesk.com</p>
                             </div>
                         </div>
 
