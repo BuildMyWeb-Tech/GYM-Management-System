@@ -1,147 +1,135 @@
-'use client'
-import Counter from "@/components/Counter";
-import OrderSummary from "@/components/OrderSummary";
-import PageTitle from "@/components/PageTitle";
-import { deleteItemFromCart } from "@/lib/features/cart/cartSlice";
-import { Trash2Icon, ShoppingBagIcon, ArrowLeftIcon } from "lucide-react";
-import Image from "next/image";
-import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import Link from "next/link";
+// app/(public)/about/page.jsx
+import Link from 'next/link';
+import {
+  Dumbbell,
+  Fingerprint,
+  CalendarCheck,
+  Building2,
+  Users,
+  ShieldCheck,
+  ArrowRight,
+} from 'lucide-react';
 
-export default function Cart() {
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '₹';
-    
-    const { cartItems } = useSelector(state => state.cart);
-    const products = useSelector(state => state.product.list);
+const values = [
+  {
+    icon: Fingerprint,
+    title: 'Built for Real Front Desks',
+    description:
+      "No manual attendance registers, no double-entry. Biometric check-in ties directly to membership status, so your staff always know who's actually paid and current.",
+  },
+  {
+    icon: Building2,
+    title: 'Multi-Branch From Day One',
+    description:
+      'Whether you run one gym or a growing chain, every branch gets its own members, plans, and staff — with a single admin view across all of them.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Data You Can Trust',
+    description:
+      'Every membership, payment, and attendance record is tracked automatically and audit-ready — no more chasing down a lost paper register.',
+  },
+];
 
-    const dispatch = useDispatch();
+const stats = [
+  { label: 'Built For', value: 'Gyms & Fitness Studios' },
+  { label: 'Core Focus', value: 'Members, Attendance, Payments' },
+  { label: 'Access', value: 'Owner + Receptionist Roles' },
+];
 
-    const [cartArray, setCartArray] = useState([]);
-    const [totalPrice, setTotalPrice] = useState(0);
+export default function AboutPage() {
+  return (
+    <div>
+      {/* Hero */}
+      <section className="bg-gradient-to-b from-slate-50 to-white">
+        <div className="max-w-5xl mx-auto px-6 py-16 md:py-20 text-center">
+          <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 text-sm font-medium px-4 py-1.5 rounded-full mb-6">
+            <Dumbbell size={15} /> About GymDesk
+          </div>
+          <h1 className="text-3xl md:text-4xl font-bold text-slate-800 leading-tight max-w-2xl mx-auto">
+            We built GymDesk because front desks deserve better than a paper register
+          </h1>
+          <p className="mt-5 text-slate-500 max-w-xl mx-auto">
+            GymDesk brings member management, biometric attendance, and payment tracking into one
+            place — so gym owners spend less time on admin and more time growing their business.
+          </p>
+        </div>
+      </section>
 
-    const createCartArray = () => {
-        setTotalPrice(0);
-        const cartArray = [];
-        for (const [key, value] of Object.entries(cartItems)) {
-            const product = products.find(product => product.id === key);
-            if (product) {
-                cartArray.push({
-                    ...product,
-                    quantity: value,
-                });
-                setTotalPrice(prev => prev + product.price * value);
-            }
-        }
-        setCartArray(cartArray);
-    }
-
-    const handleDeleteItemFromCart = (productId) => {
-        dispatch(deleteItemFromCart({ productId }))
-    }
-
-    useEffect(() => {
-        if (products.length > 0) {
-            createCartArray();
-        }
-    }, [cartItems, products]);
-
-    return cartArray.length > 0 ? (
-        <div className="min-h-screen mx-6 text-slate-800 pb-16">
-            <div className="max-w-7xl mx-auto">
-                {/* Title */}
-                <PageTitle heading="My Cart" text={`${cartArray.length} ${cartArray.length === 1 ? 'item' : 'items'} in your cart`} linkText="Continue Shopping" />
-
-                {/* Breadcrumb - New Addition */}
-                <div className="mb-6 flex items-center text-sm text-slate-500">
-                    <Link href="/" className="hover:text-slate-800 transition-colors">Home</Link>
-                    <span className="mx-2">/</span>
-                    <span className="font-medium text-slate-700">Shopping Cart</span>
-                </div>
-
-                <div className="flex items-start justify-between gap-8 max-lg:flex-col">
-                    {/* Cart Table */}
-                    <div className="w-full flex-1 bg-white rounded-xl shadow-sm overflow-hidden">
-                        <table className="w-full max-w-4xl text-slate-600 table-auto">
-                            <thead className="bg-slate-50 text-slate-700">
-                                <tr className="max-sm:text-sm">
-                                    <th className="text-left py-4 px-4 font-semibold">Product</th>
-                                    <th className="py-4 font-semibold">Quantity</th>
-                                    <th className="py-4 font-semibold">Total Price</th>
-                                    <th className="py-4 max-md:hidden font-semibold">Remove</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {cartArray.map((item, index) => (
-                                    <tr 
-                                        key={index} 
-                                        className={`space-x-2 hover:bg-slate-50 transition-colors ${index !== cartArray.length - 1 ? 'border-b border-slate-100' : ''}`}
-                                    >
-                                        <td className="flex gap-4 my-4 px-4 py-2">
-                                            <div className="flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 size-20 rounded-lg shadow-sm group">
-                                                <Image 
-                                                    src={item.images[0]} 
-                                                    className="h-16 w-auto object-contain group-hover:scale-105 transition-transform" 
-                                                    alt={item.name} 
-                                                    width={60} 
-                                                    height={60}
-                                                />
-                                            </div>
-                                            <div className="flex flex-col justify-center">
-                                                <p className="font-medium text-slate-800 hover:text-green-600 transition-colors cursor-pointer max-sm:text-sm">{item.name}</p>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className="text-xs px-2 py-0.5 bg-slate-100 rounded text-slate-500">{item.category}</span>
-                                                    <span className="md:hidden text-xs text-red-500 flex items-center" onClick={() => handleDeleteItemFromCart(item.id)}>
-                                                        <Trash2Icon size={12} className="mr-1" /> Remove
-                                                    </span>
-                                                </div>
-                                                <p className="mt-1 font-medium text-slate-700">{currency}{item.price.toLocaleString()}</p>
-                                            </div>
-                                        </td>
-                                        <td className="text-center">
-                                            <div className="flex justify-center">
-                                                <Counter productId={item.id} />
-                                            </div>
-                                        </td>
-                                        <td className="text-center font-medium">{currency}{(item.price * item.quantity).toLocaleString()}</td>
-                                        <td className="text-center max-md:hidden">
-                                            <button 
-                                                onClick={() => handleDeleteItemFromCart(item.id)} 
-                                                className="text-red-500 hover:bg-red-50 p-2.5 rounded-full active:scale-95 transition-all"
-                                            >
-                                                <Trash2Icon size={18} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-
-                        {/* Mobile: Continue Shopping */}
-                        <div className="md:hidden p-4 pt-0">
-                            <Link href="/shop" className="flex items-center justify-center gap-2 text-sm text-slate-600 py-3 px-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
-                                <ArrowLeftIcon size={16} />
-                                Continue Shopping
-                            </Link>
-                        </div>
-                    </div>
-                    
-                    {/* Order Summary */}
-                    <OrderSummary totalPrice={totalPrice} items={cartArray} />
-                </div>
+      {/* Stats strip */}
+      <section className="border-y border-slate-100 bg-white">
+        <div className="max-w-5xl mx-auto px-6 py-8 grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
+          {stats.map((s, i) => (
+            <div key={i}>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                {s.label}
+              </p>
+              <p className="text-lg font-semibold text-slate-800 mt-1">{s.value}</p>
             </div>
+          ))}
         </div>
-    ) : (
-        <div className="min-h-[80vh] mx-6 flex flex-col items-center justify-center text-slate-400">
-            <ShoppingBagIcon size={80} className="text-slate-300 mb-6" strokeWidth={1} />
-            <h1 className="text-2xl sm:text-4xl font-semibold mb-3">Your cart is empty</h1>
-            <p className="text-slate-500 mb-8 text-center">Looks like you haven't added anything to your cart yet.</p>
-            <Link 
-                href="/shop" 
-                className="flex items-center gap-2 bg-slate-800 text-white px-6 py-3 rounded-lg hover:bg-slate-700 transition-colors"
-            >
-                Start Shopping
-            </Link>
+      </section>
+
+      {/* Values */}
+      <section className="py-16 md:py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="inline-block px-3 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-full mb-3">
+              WHAT WE BELIEVE
+            </span>
+            <h2 className="text-2xl md:text-3xl font-bold text-slate-800">
+              Software that fits how gyms actually run
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+            {values.map((v, i) => (
+              <div key={i} className="bg-slate-50 border border-slate-100 rounded-2xl p-7">
+                <div className="w-12 h-12 rounded-xl bg-green-600 flex items-center justify-center mb-5">
+                  <v.icon size={22} className="text-white" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-800 mb-2">{v.title}</h3>
+                <p className="text-sm text-slate-500 leading-relaxed">{v.description}</p>
+              </div>
+            ))}
+          </div>
         </div>
-    )
+      </section>
+
+      {/* Who it's for */}
+      <section className="py-16 bg-slate-50">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <Users size={36} className="text-green-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-slate-800 mb-3">
+            Built for owners, receptionists, and members alike
+          </h2>
+          <p className="text-slate-500 max-w-2xl mx-auto">
+            Branch owners get a full dashboard across members, revenue, and attendance.
+            Receptionists get exactly the tools they need at the front desk — registration,
+            check-in, and checkout — without extra clutter. And members get a smoother, faster
+            experience walking through the door.
+          </p>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-16 bg-gradient-to-r from-green-600 to-green-700">
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <CalendarCheck size={32} className="text-white mx-auto mb-4" />
+          <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
+            Ready to see it running in your gym?
+          </h2>
+          <p className="text-green-50 mb-8">
+            Register your branch and get approved within 1-2 business days.
+          </p>
+          <Link
+            href="/create-store"
+            className="inline-flex items-center gap-2 bg-white text-green-700 px-7 py-3 rounded-xl font-medium hover:bg-green-50 transition-colors"
+          >
+            Get Started <ArrowRight size={16} />
+          </Link>
+        </div>
+      </section>
+    </div>
+  );
 }

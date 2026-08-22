@@ -1,6 +1,6 @@
 // components/Navbar.jsx
 'use client'
-import { PackageIcon, ShoppingCart, HomeIcon, UserIcon, Dumbbell } from "lucide-react";
+import { ShoppingCart, HomeIcon, UserIcon, Dumbbell } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
@@ -61,11 +61,7 @@ const Navbar = () => {
                                     Login
                                 </button>
                             ) : (
-                                <UserButton afterSignOutUrl="/">
-                                    <UserButton.MenuItems>
-                                        <UserButton.Action labelIcon={<PackageIcon size={16}/>} label="My Orders" onClick={()=> router.push('/orders')} />
-                                    </UserButton.MenuItems>
-                                </UserButton>
+                                <UserButton afterSignOutUrl="/" />
                             )}
                         </div>
 
@@ -74,7 +70,6 @@ const Navbar = () => {
                                 <UserButton afterSignOutUrl="/">
                                     <UserButton.MenuItems>
                                         <UserButton.Action labelIcon={<HomeIcon size={16}/>} label="Home" onClick={()=> router.push('/')} />
-                                        <UserButton.Action labelIcon={<PackageIcon size={16}/>} label="My Orders" onClick={()=> router.push('/orders')} />
                                         <UserButton.Action labelIcon={<ShoppingCart size={16}/>} label="Cart" onClick={()=> router.push('/cart')} />
                                     </UserButton.MenuItems>
                                 </UserButton>
@@ -90,14 +85,10 @@ const Navbar = () => {
             </nav>
 
             <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 sm:hidden shadow-lg">
-                <div className="grid grid-cols-3 py-1">
+                <div className="grid grid-cols-2 py-1">
                     <Link href="/" className={`flex flex-col items-center justify-center py-2 text-xs ${pathname === '/' ? 'text-green-600' : 'text-slate-600'}`}>
                         <HomeIcon size={20} className={`mb-1 ${pathname === '/' ? 'text-green-600' : 'text-slate-500'}`} />
                         <span className="font-medium">Home</span>
-                    </Link>
-                    <Link href="/orders" className={`flex flex-col items-center justify-center py-2 text-xs ${pathname.includes('/orders') ? 'text-green-600' : 'text-slate-600'}`}>
-                        <PackageIcon size={20} className={`mb-1 ${pathname.includes('/orders') ? 'text-green-600' : 'text-slate-500'}`} />
-                        <span className="font-medium">Orders</span>
                     </Link>
                     <Link href="/cart" className={`flex flex-col items-center justify-center py-2 text-xs ${pathname.includes('/cart') ? 'text-green-600' : 'text-slate-600'} relative`}>
                         <div className="relative">
