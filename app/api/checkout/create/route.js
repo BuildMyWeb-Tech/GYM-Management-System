@@ -1,6 +1,6 @@
 // app/api/checkout/create/route.js
 import prisma from '@/lib/prisma';
-import razorpay from '@/lib/razorpay';
+import getRazorpay from '@/lib/razorpay';
 import { resolveBranchAccess } from '@/lib/resolveBranchAccess';
 import { PERMISSIONS } from '@/middlewares/authEmployee';
 import {
@@ -97,6 +97,7 @@ export async function POST(request) {
     }
 
     // RAZORPAY — create the razorpay order and hand it to the frontend to open the widget
+    const razorpay = getRazorpay();
     const razorpayOrder = await razorpay.orders.create({
       amount: Math.round(total * 100), // paise
       currency: 'INR',
