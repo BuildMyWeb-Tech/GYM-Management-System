@@ -2,10 +2,18 @@ import prisma from "@/lib/prisma"
 import { NextResponse } from "next/server"
 import Stripe from "stripe"
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+let stripe
+
+function getStripe() {
+    if (!stripe) {
+        stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+    }
+    return stripe
+}
 
 export async function POST(request){
     try {
+        const stripe = getStripe()
         const body = await request.text()
         const sig = request.headers.get('stripe-signature')
 
