@@ -13,6 +13,7 @@ const SETTINGS_SELECT = {
   username: true,
   address: true,
   phone: true,
+  whatsappNumber: true,
   email: true,
   contact: true,
   operatingHours: true,
@@ -23,13 +24,11 @@ const SETTINGS_SELECT = {
   commission: { select: { percentage: true } },
 };
 
-// GET /api/store/settings — Fetch branch settings
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const queryBranchId = searchParams.get('branchId');
 
-    // Admin fetching any branch's settings
     if (queryBranchId) {
       const { userId } = getAuth(request);
       if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
@@ -44,7 +43,6 @@ export async function GET(request) {
       return NextResponse.json({ settings: branch });
     }
 
-    // Owner or receptionist fetching their own branch's settings
     const access = await resolveBranchAccess(request, PERMISSIONS.MANAGE_BRANCH_SETTINGS);
     if (access.error) return NextResponse.json({ error: access.error }, { status: access.status });
 
@@ -61,18 +59,27 @@ export async function GET(request) {
   }
 }
 
-// POST /api/store/settings — Update branch settings
 export async function POST(request) {
   try {
     const access = await resolveBranchAccess(request, PERMISSIONS.MANAGE_BRANCH_SETTINGS);
     if (access.error) return NextResponse.json({ error: access.error }, { status: access.status });
 
     const body = await request.json();
-    const { name, description, address, phone, email, contact, operatingHours, gstNumber } = body;
+    const {
+      name,
+      description,
+      address,
+      phone,
+      whatsappNumber,
+      email,
+      contact,
+      operatingHours,
+      gstNumber,
+    } = body;
 
     if (!name || !email || !phone || !contact) {
       return NextResponse.json(
-        { error: 'Name, email, phone and contact are required' },
+        { error: 'Branch name, email, phone, and contact are required' },
         { status: 400 }
       );
     }
@@ -84,6 +91,7 @@ export async function POST(request) {
         description: description || '',
         address: address || '',
         phone,
+        whatsappNumber: whatsappNumber || null,
         email,
         contact,
         operatingHours: operatingHours || null,

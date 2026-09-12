@@ -6,8 +6,17 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import { getBranchAuthHeader } from '@/lib/authHeader';
+import { sendWhatsAppConfirmation } from '@/lib/whatsapp';
 import Loading from '@/components/Loading';
-import { Clock, User, ArrowLeft, CheckCircle2, CreditCard, Dumbbell } from 'lucide-react';
+import {
+  Clock,
+  User,
+  ArrowLeft,
+  CheckCircle2,
+  CreditCard,
+  Dumbbell,
+  MessageCircle,
+} from 'lucide-react';
 
 export default function OrderDetail({ basePath, orderId }) {
   const { getToken } = useAuth();
@@ -31,6 +40,10 @@ export default function OrderDetail({ basePath, orderId }) {
   if (loading) return <Loading />;
   if (!order) return null;
 
+  const handleWhatsApp = () => {
+    sendWhatsAppConfirmation(order, order.branch?.whatsappNumber || order.branch?.phone);
+  };
+
   return (
     <div className="px-3 sm:px-6 py-4 sm:py-6 pb-28 max-w-2xl">
       <Link
@@ -42,7 +55,7 @@ export default function OrderDetail({ basePath, orderId }) {
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-gradient-to-r from-slate-800 to-slate-700 p-6 sm:p-8">
-          <div className="flex justify-between items-start">
+          <div className="flex justify-between items-start flex-wrap gap-3">
             <div>
               <p className="text-slate-400 text-xs font-medium tracking-wide">PAYMENT RECEIPT</p>
               <h1 className="text-xl font-bold text-white mt-1">
@@ -55,11 +68,19 @@ export default function OrderDetail({ basePath, orderId }) {
                 <User size={13} /> {order.member.fullName}
               </Link>
             </div>
-            <span
-              className={`text-xs font-medium px-3 py-1.5 rounded-full flex items-center gap-1.5 ${order.isPaid ? 'bg-green-500/20 text-green-300' : 'bg-amber-500/20 text-amber-300'}`}
-            >
-              <CheckCircle2 size={12} /> {order.isPaid ? 'Paid' : 'Awaiting Payment'}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleWhatsApp}
+                className="text-xs font-medium bg-green-500/20 hover:bg-green-500/30 text-green-300 px-3 py-1.5 rounded-lg flex items-center gap-1.5"
+              >
+                <MessageCircle size={13} /> WhatsApp
+              </button>
+              <span
+                className={`text-xs font-medium px-3 py-1.5 rounded-full flex items-center gap-1.5 ${order.isPaid ? 'bg-green-500/20 text-green-300' : 'bg-amber-500/20 text-amber-300'}`}
+              >
+                <CheckCircle2 size={12} /> {order.isPaid ? 'Paid' : 'Awaiting Payment'}
+              </span>
+            </div>
           </div>
         </div>
 

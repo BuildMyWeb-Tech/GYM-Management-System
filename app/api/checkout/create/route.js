@@ -68,7 +68,7 @@ export async function POST(request) {
             couponDiscount,
             orderItems: { create: resolvedItems },
           },
-          include: { orderItems: true },
+          include: { orderItems: true, member: { select: { fullName: true, phone: true } } },
         });
 
         await tx.orderTimeline.create({

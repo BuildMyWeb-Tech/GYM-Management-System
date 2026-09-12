@@ -6,13 +6,24 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { getBranchAuthHeader } from '@/lib/authHeader';
 import Loading from '@/components/Loading';
-import { Dumbbell, RefreshCcw, Save, Mail, Phone, MapPin, Clock, FileText } from 'lucide-react';
+import {
+  Dumbbell,
+  RefreshCcw,
+  Save,
+  Mail,
+  Phone,
+  MapPin,
+  Clock,
+  FileText,
+  MessageCircle,
+} from 'lucide-react';
 
 const EMPTY_FORM = {
   name: '',
   description: '',
   address: '',
   phone: '',
+  whatsappNumber: '',
   email: '',
   contact: '',
   operatingHours: '',
@@ -36,6 +47,7 @@ export default function BranchSettingsPage() {
         description: s.description || '',
         address: s.address || '',
         phone: s.phone || '',
+        whatsappNumber: s.whatsappNumber || '',
         email: s.email || '',
         contact: s.contact || '',
         operatingHours: s.operatingHours || '',
@@ -198,6 +210,29 @@ export default function BranchSettingsPage() {
                   className="w-full pl-9 pr-3.5 py-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-100 focus:border-green-400"
                 />
               </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+              WhatsApp Number{' '}
+              <span className="text-slate-400 font-normal normal-case">
+                (used for payment confirmations — defaults to Phone if left blank)
+              </span>
+            </label>
+            <div className="relative">
+              <MessageCircle
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                name="whatsappNumber"
+                value={form.whatsappNumber}
+                onChange={onChange}
+                type="tel"
+                placeholder="e.g. 9876543210"
+                className="w-full pl-9 pr-3.5 py-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-100 focus:border-green-400"
+              />
             </div>
           </div>
 
