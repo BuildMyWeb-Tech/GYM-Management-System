@@ -30,6 +30,7 @@ model Branch {
   username        String          @unique
   address         String
   phone           String
+  whatsappNumber  String?
   status          BranchStatus    @default(PENDING)
   isActive        Boolean         @default(false)
   logo            String
