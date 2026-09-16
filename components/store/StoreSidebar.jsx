@@ -15,6 +15,10 @@ import {
   CreditCard,
   CalendarCheck,
   Fingerprint,
+  LogOut,
+  Bell,
+  MessageSquare,
+  FileText,
 } from 'lucide-react';
 
 import Image from 'next/image';
@@ -63,6 +67,24 @@ const ALL_LINKS = [
     ownerOnly: true,
   },
   { name: 'Devices', href: '/store/devices', icon: Fingerprint, permission: null, ownerOnly: true },
+  // {
+  //   name: 'Reminders',
+  //   href: '/store/reminders',
+  //   icon: Bell,
+  //   permission: PERMISSIONS.VIEW_REPORTS,
+  // },
+  // {
+  //   name: 'Broadcast',
+  //   href: '/store/broadcast',
+  //   icon: MessageSquare,
+  //   permission: PERMISSIONS.COLLECT_PAYMENT,
+  // },
+  // {
+  //   name: 'Closing Report',
+  //   href: '/store/closing-report',
+  //   icon: FileText,
+  //   permission: PERMISSIONS.VIEW_REPORTS,
+  // },
   {
     name: 'Branch Settings',
     href: '/store/settings',

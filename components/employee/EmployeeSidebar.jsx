@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { HomeIcon, ShoppingBag, BarChart2, Layers, Users, CreditCard, CalendarCheck, X, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
+import { HomeIcon, ShoppingBag, BarChart2, Layers, Users, CreditCard, CalendarCheck, X, ChevronLeft, ChevronRight, LogOut, Bell, MessageSquare, FileText } from 'lucide-react';
 
 import Image from 'next/image';
 import { useState } from 'react';
@@ -46,6 +46,24 @@ const ALL_LINKS = [
     icon: BarChart2,
     permission: PERMISSIONS.VIEW_REPORTS,
   },
+  // {
+  //   name: 'Reminders',
+  //   href: '/employee/reminders',
+  //   icon: Bell,
+  //   permission: PERMISSIONS.VIEW_REPORTS,
+  // },
+  // {
+  //   name: 'Broadcast',
+  //   href: '/employee/broadcast',
+  //   icon: MessageSquare,
+  //   permission: PERMISSIONS.COLLECT_PAYMENT,
+  // },
+  // {
+  //   name: 'Closing Report',
+  //   href: '/employee/closing-report',
+  //   icon: FileText,
+  //   permission: PERMISSIONS.VIEW_REPORTS,
+  // },
 ];
 
 export default function EmployeeSidebar({ branchInfo, employee, closeMobileMenu }) {

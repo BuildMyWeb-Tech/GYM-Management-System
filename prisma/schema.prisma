@@ -332,12 +332,15 @@ model NotificationLog {
   status       NotificationStatus   @default(PENDING)
   messageRef   String?
   errorMessage String?
+  sentAt       DateTime?
+  metadata     Json?
   createdAt    DateTime             @default(now())
 
   member       Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@index([memberId])
   @@index([branchId])
+  @@index([type])
   @@index([status])
   @@index([createdAt])
 }
@@ -424,6 +427,7 @@ enum NotificationType {
   EXPIRY_REMINDER
   PAYMENT_DUE
   RENEWAL_CONFIRMATION
+  ANNOUNCEMENT
 }
 
 enum NotificationStatus {
