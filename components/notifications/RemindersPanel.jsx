@@ -109,7 +109,7 @@ function ExpiryRemindersTab({ basePath }) {
     return (
       <div className="flex flex-col items-center py-16 text-slate-400">
         <CheckCircle2 size={40} className="mb-3 text-green-400" />
-        <p className="font-medium text-slate-600">No memberships expiring in the next 7 days</p>
+        <p className="font-medium text-slate-600">No memberships expiring in the next 3 days</p>
       </div>
     );
   }

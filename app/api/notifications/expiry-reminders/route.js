@@ -25,11 +25,11 @@ export async function GET(request) {
     const { branchId } = access;
 
     const today = startOfToday();
-    const in8Days = new Date(today);
-    in8Days.setDate(in8Days.getDate() + 8);
+    const in4Days = new Date(today);
+    in4Days.setDate(in4Days.getDate() + 4);
 
     const memberships = await prisma.membership.findMany({
-      where: { branchId, status: 'ACTIVE', expiryDate: { gte: today, lt: in8Days } },
+      where: { branchId, status: 'ACTIVE', expiryDate: { gte: today, lt: in4Days } },
       include: {
         member: { select: { id: true, fullName: true, phone: true } },
         plan: { select: { name: true } },
@@ -58,7 +58,7 @@ export async function GET(request) {
       expiry.setHours(0, 0, 0, 0);
       const diffMs = expiry.getTime() - today.getTime();
       const daysLeft = Math.max(0, Math.round(diffMs / 86400000));
-      const bucket = daysLeft === 0 ? 0 : daysLeft <= 1 ? 1 : daysLeft <= 3 ? 3 : 7;
+      const bucket = daysLeft === 0 ? 0 : 3;
 
       if (!groupMap[bucket]) groupMap[bucket] = [];
       const lastLog = logByMember[ms.memberId];
@@ -82,7 +82,7 @@ export async function GET(request) {
         const d = Number(days);
         return {
           daysUntilExpiry: d,
-          label: d === 0 ? 'Expiring Today' : d === 1 ? 'Expiring Tomorrow' : `Expiring in ${d} days`,
+          label: d === 0 ? 'Expiring Today' : 'Expiring in 3 days',
           count: items.length,
           members: items,
         };

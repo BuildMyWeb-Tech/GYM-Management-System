@@ -23,33 +23,35 @@ model User {
 // ─── BRANCH (was Store) ───────────────────────────────────────────────────────
 
 model Branch {
-  id              String          @id @default(cuid())
-  userId          String          @unique
-  name            String
-  description     String
-  username        String          @unique
-  address         String
-  phone           String
-  whatsappNumber  String?
-  status          BranchStatus    @default(PENDING)
-  isActive        Boolean         @default(false)
-  logo            String
-  email           String
-  contact         String
-  operatingHours  String?
-  gstNumber       String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id               String          @id @default(cuid())
+  userId           String          @unique
+  name             String
+  description      String
+  username         String          @unique
+  address          String
+  phone            String
+  whatsappNumber   String?
+  whatsappEnabled  Boolean         @default(false)
+  status           BranchStatus    @default(PENDING)
+  isActive         Boolean         @default(false)
+  logo             String
+  email            String
+  contact          String
+  operatingHours   String?
+  gstNumber        String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
-  user            User            @relation(fields: [userId], references: [id])
-  employees       Employee[]
-  planCategories  PlanCategory[]
-  membershipPlans MembershipPlan[]
-  ptPackages      PTPackage[]
-  members         Member[]
-  orders          Order[]
-  devices         BiometricDevice[]
-  commission      Commission?
+  user             User            @relation(fields: [userId], references: [id])
+  employees        Employee[]
+  planCategories   PlanCategory[]
+  membershipPlans  MembershipPlan[]
+  ptPackages       PTPackage[]
+  members          Member[]
+  orders           Order[]
+  devices          BiometricDevice[]
+  commission       Commission?
+  whatsappAccount  WhatsAppAccount?
 
   @@index([status])
   @@index([isActive])
@@ -321,7 +323,7 @@ model OrderTimeline {
   @@index([createdAt])
 }
 
-// ─── NOTIFICATION LOG (new — Phase 6 reminders) ────────────────────────────────
+// ─── NOTIFICATION LOG (reminders + individual messages) ─────────────────────────
 
 model NotificationLog {
   id           String               @id @default(cuid())
@@ -334,13 +336,103 @@ model NotificationLog {
   errorMessage String?
   sentAt       DateTime?
   metadata     Json?
+  broadcastId  String?
   createdAt    DateTime             @default(now())
 
   member       Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  broadcast    BroadcastCampaign?   @relation(fields: [broadcastId], references: [id])
 
   @@index([memberId])
   @@index([branchId])
   @@index([type])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ─── WHATSAPP WORKER MODELS ───────────────────────────────────────────────────
+
+model WhatsAppAccount {
+  id                    String              @id @default(cuid())
+  branchId              String              @unique
+  connectionState       WAConnectionState   @default(DISCONNECTED)
+  status                String              @default("disconnected")
+  qrDataUri             String?             @db.Text
+  qrGeneratedAt         DateTime?
+  workerInstanceId      String?
+  lastHeartbeatAt       DateTime?
+  connectRequestedAt    DateTime?
+  disconnectRequestedAt DateTime?
+  reconnectAttempts     Int                 @default(0)
+  lastError             String?
+  lastConnectedAt       DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  branch                Branch              @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  session               WhatsAppSession?
+  outboxMessages        MessageOutbox[]
+  broadcasts            BroadcastCampaign[]
+}
+
+model WhatsAppSession {
+  id             String   @id @default(cuid())
+  branchId       String   @unique
+  encryptedState String   @db.Text
+  version        Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  account        WhatsAppAccount @relation(fields: [branchId], references: [branchId], onDelete: Cascade)
+}
+
+model MessageOutbox {
+  id                      String          @id @default(cuid())
+  branchId                String
+  recipient               String
+  messageType             OutboxMsgType   @default(TEXT)
+  payload                 Json
+  status                  OutboxStatus    @default(PENDING)
+  scheduledAt             DateTime        @default(now())
+  lockedAt                DateTime?
+  lockedBy                String?
+  attempts                Int             @default(0)
+  maxAttempts             Int             @default(3)
+  broadcastId             String?
+  broadcastRecipientIndex Int?
+  sentMessageId           String?
+  errorMessage            String?
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  account                 WhatsAppAccount    @relation(fields: [branchId], references: [branchId], onDelete: Cascade)
+  broadcast               BroadcastCampaign? @relation(fields: [broadcastId], references: [id])
+
+  @@index([branchId, status, scheduledAt])
+  @@index([broadcastId])
+}
+
+model BroadcastCampaign {
+  id             String          @id @default(cuid())
+  branchId       String
+  message        String?         @db.Text
+  mediaUrl       String?
+  mediaType      String?
+  status         BroadcastStatus @default(QUEUED)
+  totalCount     Int             @default(0)
+  sentCount      Int             @default(0)
+  failedCount    Int             @default(0)
+  pendingCount   Int             @default(0)
+  deliveredCount Int             @default(0)
+  sendIntervalMs Int             @default(1500)
+  recipients     Json            @default("[]")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  account        WhatsAppAccount  @relation(fields: [branchId], references: [branchId], onDelete: Cascade)
+  outboxMessages MessageOutbox[]
+  notifications  NotificationLog[]
+
+  @@index([branchId])
   @@index([status])
   @@index([createdAt])
 }
@@ -434,4 +526,41 @@ enum NotificationStatus {
   SENT
   FAILED
   PENDING
+}
+
+enum WAConnectionState {
+  DISCONNECTED
+  STARTING
+  AUTHENTICATING
+  QR_REQUIRED
+  CONNECTED
+  RECONNECTING
+  LOGGED_OUT
+  ERROR
+}
+
+enum OutboxMsgType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum BroadcastStatus {
+  DRAFT
+  QUEUED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  PAUSED
+  CANCELLED
 }
