@@ -20,6 +20,14 @@ const MSG_MAX = 1000;
 const POLL_MS = 2500;
 const ACCEPT = 'image/*,video/*,audio/*,application/pdf';
 
+function mimeToWhatsAppType(mimeType) {
+  if (!mimeType) return 'DOCUMENT';
+  if (mimeType.startsWith('image/')) return 'IMAGE';
+  if (mimeType.startsWith('video/')) return 'VIDEO';
+  if (mimeType.startsWith('audio/')) return 'AUDIO';
+  return 'DOCUMENT';
+}
+
 const AVATAR_BG = [
   'bg-blue-500', 'bg-purple-500', 'bg-green-600',
   'bg-orange-400', 'bg-pink-500', 'bg-indigo-500',
