@@ -46,11 +46,28 @@ const STATUS_META = {
 
 const RECIPIENT_STATUS_CLS = {
   sent:       'bg-green-100 text-green-700',
-  delivered:  'bg-blue-100 text-blue-700',
+  delivered:  'bg-teal-100 text-teal-700',
+  read:       'bg-indigo-100 text-indigo-700',
   failed:     'bg-red-100 text-red-700',
   queued:     'bg-slate-100 text-slate-500',
   processing: 'bg-amber-100 text-amber-700',
 };
+
+const SUCCESS_STATUSES = new Set(['sent', 'delivered', 'read']);
+
+function computeStats(recipients, apiData) {
+  if (!Array.isArray(recipients) || recipients.length === 0) return apiData;
+  const sent    = recipients.filter(r => SUCCESS_STATUSES.has(r.status)).length;
+  const failed  = recipients.filter(r => r.status === 'failed').length;
+  const queued  = recipients.filter(r => r.status === 'queued' || r.status === 'processing').length;
+  return {
+    ...apiData,
+    totalCount:   recipients.length,
+    sentCount:    sent,
+    failedCount:  failed,
+    pendingCount: queued,
+  };
+}
 
 // ── Contact Row ────────────────────────────────────────────────────────────────
 
@@ -291,10 +308,10 @@ function ProgressPanel({ broadcastId, onReset, getToken }) {
 
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: 'Total',   value: campaign.totalCount,   color: 'text-slate-700' },
-          { label: 'Sent',    value: campaign.sentCount,    color: 'text-green-600' },
-          { label: 'Failed',  value: campaign.failedCount,  color: 'text-red-500' },
-          { label: 'Pending', value: campaign.pendingCount, color: 'text-amber-600' },
+          { label: 'Total',   value: campaign.totalCount,                                                   color: 'text-slate-700' },
+          { label: 'Sent',    value: (campaign.sentCount || 0) + (campaign.deliveredCount || 0),          color: 'text-green-600' },
+          { label: 'Failed',  value: campaign.failedCount,                                                color: 'text-red-500' },
+          { label: 'Pending', value: campaign.pendingCount,                                               color: 'text-amber-600' },
         ].map(({ label, value, color }) => (
           <div key={label} className="bg-slate-50 rounded-xl p-3 text-center">
             <p className={`text-2xl font-bold ${color}`}>{value ?? 0}</p>
@@ -357,12 +374,16 @@ function DetailModal({ campaignId, onClose, getToken }) {
           <div className="py-12"><Loading /></div>
         ) : data ? (
           <div className="overflow-y-auto p-5 space-y-4">
+            {/* Compute stats from recipients array so Delivered/Read are counted as Sent */}
+            {(() => {
+              const s = computeStats(data.recipients, data);
+              return (
             <div className="grid grid-cols-4 gap-2">
               {[
-                { label: 'Total',   value: data.totalCount,   color: 'text-slate-700' },
-                { label: 'Sent',    value: data.sentCount,    color: 'text-green-600' },
-                { label: 'Failed',  value: data.failedCount,  color: 'text-red-500' },
-                { label: 'Pending', value: data.pendingCount, color: 'text-amber-600' },
+                { label: 'Total',   value: s.totalCount,   color: 'text-slate-700' },
+                { label: 'Sent',    value: s.sentCount,    color: 'text-green-600' },
+                { label: 'Failed',  value: s.failedCount,  color: 'text-red-500' },
+                { label: 'Pending', value: s.pendingCount, color: 'text-amber-600' },
               ].map(({ label, value, color }) => (
                 <div key={label} className="bg-slate-50 rounded-xl p-2.5 text-center">
                   <p className={`text-xl font-bold ${color}`}>{value ?? 0}</p>
@@ -370,6 +391,8 @@ function DetailModal({ campaignId, onClose, getToken }) {
                 </div>
               ))}
             </div>
+            );
+            })()}
 
             {data.message && (
               <div className="bg-slate-50 rounded-xl p-3">
@@ -504,10 +527,10 @@ function HistoryTab({ getToken }) {
 
               <div className="grid grid-cols-4 gap-2">
                 {[
-                  { label: 'Total',   value: c.totalCount,   color: 'text-slate-700' },
-                  { label: 'Sent',    value: c.sentCount,    color: 'text-green-600' },
-                  { label: 'Failed',  value: c.failedCount,  color: 'text-red-500' },
-                  { label: 'Pending', value: c.pendingCount, color: 'text-amber-600' },
+                  { label: 'Total',   value: c.totalCount,                                          color: 'text-slate-700' },
+                  { label: 'Sent',    value: (c.sentCount || 0) + (c.deliveredCount || 0),          color: 'text-green-600' },
+                  { label: 'Failed',  value: c.failedCount,                                         color: 'text-red-500' },
+                  { label: 'Pending', value: c.pendingCount,                                        color: 'text-amber-600' },
                 ].map(({ label, value, color }) => (
                   <div key={label} className="bg-slate-50 rounded-lg p-2 text-center">
                     <p className={`text-base font-bold ${color}`}>{value ?? 0}</p>
