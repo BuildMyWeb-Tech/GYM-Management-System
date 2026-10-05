@@ -128,12 +128,23 @@ function MediaPicker({ onUploaded, onCleared, uploadedMedia, getToken }) {
 
 // ── WA Status Banner ──────────────────────────────────────────────────────────
 
-function WAStatusBanner({ connected, onSwitchTab }) {
-  if (connected) {
+function WAStatusBanner({ status, onSwitchTab }) {
+  if (status.connected && status.workerAlive) {
     return (
       <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700">
         <Wifi size={13} className="text-green-500" />
         WhatsApp connected — messages send via your number
+      </div>
+    );
+  }
+  if (status.connected && !status.workerAlive) {
+    return (
+      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
+        <div className="flex items-center gap-2">
+          <WifiOff size={13} className="text-amber-500" />
+          Worker offline — messages will use wa.me links (deploy to Render for auto-send)
+        </div>
+        <button onClick={onSwitchTab} className="text-xs font-semibold underline hover:text-amber-900 flex-shrink-0">Details</button>
       </div>
     );
   }
@@ -505,7 +516,7 @@ export default function BroadcastPanel() {
   const [result, setResult] = useState(null);
 
   // WA status
-  const [waConnected, setWaConnected] = useState(false);
+  const [waStatus, setWaStatus] = useState({ connected: false, workerAlive: false });
 
   const loadMembers = useCallback(async (q = '', pg = 1) => {
     setMembersLoading(true);
@@ -525,7 +536,10 @@ export default function BroadcastPanel() {
     try {
       const headers = await getBranchAuthHeader(getToken);
       const { data } = await axios.get('/api/whatsapp/status', { headers });
-      setWaConnected(data?.connectionState === 'CONNECTED');
+      setWaStatus({
+        connected: data?.connectionState === 'CONNECTED',
+        workerAlive: data?.isWorkerAlive === true,
+      });
     } catch {}
   }, [getToken]);
 
@@ -639,6 +653,58 @@ export default function BroadcastPanel() {
         <>
           {result?.method === 'baileys' ? (
             <ProgressPanel broadcastId={result.broadcastId} onReset={reset} getToken={getToken} />
+          ) : result ? (
+            /* Non-Baileys result (Cloud API or wa.me links) */
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-slate-800">Broadcast Result</h2>
+                <button onClick={reset} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-green-600 transition-colors">
+                  <RotateCcw size={14} /> New Broadcast
+                </button>
+              </div>
+
+              {result.method === 'links' && (
+                <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
+                  <WifiOff size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                  <span>Worker not running — click each link below to send manually via WhatsApp Web. To enable auto-send, deploy on Render with <code className="bg-amber-100 px-1 rounded">node server.mjs</code>.</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'Total',  value: result.total,  color: 'text-slate-700' },
+                  { label: 'Sent',   value: result.sent,   color: 'text-green-600' },
+                  { label: 'Failed', value: result.failed, color: 'text-red-500' },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="bg-slate-50 rounded-xl p-3 text-center">
+                    <p className={`text-2xl font-bold ${color}`}>{value ?? 0}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{label}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {(result.results || []).map((r) => (
+                  <div key={r.memberId} className="flex items-center gap-3 text-sm">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${avatarBg(r.fullName)}`}>
+                      {initial(r.fullName)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-slate-700 truncate font-medium text-xs">{r.fullName}</p>
+                      <p className="text-slate-400 text-xs">{r.memberId}</p>
+                    </div>
+                    {r.status === 'link' ? (
+                      <a href={r.fallbackUrl} target="_blank" rel="noopener noreferrer"
+                        className="flex-shrink-0 text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
+                        Send WA
+                      </a>
+                    ) : (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize flex-shrink-0 ${RECIPIENT_STATUS_CLS[r.status] || 'bg-slate-100 text-slate-500'}`}>{r.status}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               {/* Left: Contacts */}
@@ -691,7 +757,7 @@ export default function BroadcastPanel() {
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col gap-4">
                 <h2 className="font-semibold text-slate-800 text-sm">Message</h2>
 
-                <WAStatusBanner connected={waConnected} onSwitchTab={() => setActiveTab('connect')} />
+                <WAStatusBanner status={waStatus} onSwitchTab={() => setActiveTab('connect')} />
 
                 <div>
                   <textarea value={message} onChange={(e) => setMessage(e.target.value.slice(0, MSG_MAX))}

@@ -42,9 +42,12 @@ export async function POST(request) {
     // Check if Baileys worker is connected
     const waAccount = await prisma.whatsAppAccount.findUnique({
       where: { branchId },
-      select: { connectionState: true },
+      select: { connectionState: true, lastHeartbeatAt: true },
     });
-    const baileysConnected = waAccount?.connectionState === 'CONNECTED';
+    const workerAlive = waAccount?.lastHeartbeatAt
+      ? (Date.now() - new Date(waAccount.lastHeartbeatAt).getTime()) < 2 * 60 * 1000
+      : false;
+    const baileysConnected = waAccount?.connectionState === 'CONNECTED' && workerAlive;
 
     if (baileysConnected) {
       // ── Baileys path: queue to MessageOutbox ──────────────────────────────
