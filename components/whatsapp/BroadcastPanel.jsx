@@ -67,24 +67,62 @@ function ContactRow({ member, selected, onToggle }) {
 
 // ── Media Picker ───────────────────────────────────────────────────────────────
 
+const IK_UPLOAD_URL = 'https://upload.imagekit.io/api/v1/files/upload';
+const MAX_FILE_MB = 25;
+
 function MediaPicker({ onUploaded, onCleared, uploadedMedia, getToken }) {
   const fileRef = useRef(null);
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (file.size > MAX_FILE_MB * 1024 * 1024) {
+      toast.error(`File too large — max ${MAX_FILE_MB} MB`);
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+
     const localPreview = URL.createObjectURL(file);
     onUploaded({ uploading: true, localPreview, name: file.name, mimeType: file.type });
+
     try {
       const headers = await getBranchAuthHeader(getToken);
+
+      // Step 1 — get a short-lived ImageKit auth token from our server
+      const { data: auth } = await axios.get('/api/whatsapp/upload-media', { headers });
+
+      // Step 2 — upload DIRECTLY to ImageKit from the browser
+      // This bypasses Vercel's 4.5 MB serverless body limit entirely
       const fd = new FormData();
       fd.append('file', file);
-      // Do NOT set Content-Type manually — axios sets multipart/form-data with boundary automatically
-      const { data } = await axios.post('/api/whatsapp/upload-media', fd, { headers });
-      onUploaded({ url: data.url, fileId: data.fileId, name: file.name, mimeType: data.mimeType, mediaType: data.mediaType, localPreview });
+      fd.append('fileName', `${Date.now()}-${file.name.replace(/[^a-z0-9._-]/gi, '_')}`);
+      fd.append('publicKey', auth.publicKey);
+      fd.append('signature', auth.signature);
+      fd.append('expire', String(auth.expire));
+      fd.append('token', auth.token);
+      fd.append('folder', auth.folder);
+      fd.append('useUniqueFileName', 'true');
+
+      const ikRes = await fetch(IK_UPLOAD_URL, { method: 'POST', body: fd });
+      if (!ikRes.ok) {
+        const ikErr = await ikRes.json().catch(() => ({}));
+        throw new Error(ikErr.message || `ImageKit upload failed (${ikRes.status})`);
+      }
+      const result = await ikRes.json();
+
+      const mimeType = file.type || 'application/octet-stream';
+      onUploaded({
+        url: result.url,
+        fileId: result.fileId,
+        name: result.name || file.name,
+        mimeType,
+        mediaType: mimeToWhatsAppType(mimeType),
+        localPreview,
+      });
       toast.success('Media uploaded');
     } catch (err) {
-      toast.error(err?.response?.data?.error || 'Upload failed');
+      toast.error(err?.message || 'Upload failed');
       onCleared();
     } finally {
       if (fileRef.current) fileRef.current.value = '';

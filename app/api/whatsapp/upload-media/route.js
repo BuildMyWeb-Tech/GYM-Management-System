@@ -1,14 +1,34 @@
 // app/api/whatsapp/upload-media/route.js
-// POST – upload a media file (image/video/audio) to ImageKit for WhatsApp broadcast use.
-// Returns { url, fileId, name, mimeType } scoped to the caller's branch.
+// GET  – returns a short-lived ImageKit auth token so the client can upload
+//        directly to ImageKit (avoids Vercel's 4.5 MB serverless body limit).
+// POST – (legacy) server-side upload path kept for small files / fallback.
 
 import { resolveBranchAccess } from '@/lib/resolveBranchAccess';
 import { PERMISSIONS } from '@/middlewares/authEmployee';
 import imagekit from '@/configs/imageKit';
 import { NextResponse } from 'next/server';
 
-// Max 15 MB per file (ImageKit free plan supports up to 25 MB)
-const MAX_BYTES = 15 * 1024 * 1024;
+// GET – return auth params for client-side direct upload to ImageKit
+export async function GET(request) {
+  try {
+    const access = await resolveBranchAccess(request, PERMISSIONS.COLLECT_PAYMENT);
+    if (access.error) return NextResponse.json({ error: access.error }, { status: access.status });
+    const { branchId } = access;
+
+    // getAuthenticationParameters() is synchronous — returns { token, expire, signature }
+    const auth = imagekit.getAuthenticationParameters();
+
+    return NextResponse.json({
+      ...auth,
+      publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+      urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT,
+      folder: `/whatsapp-media/${branchId}`,
+    });
+  } catch (err) {
+    console.error('GET /api/whatsapp/upload-media error:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
 
 function mimeToWhatsAppType(mimeType) {
   if (mimeType.startsWith('image/')) return 'IMAGE';
@@ -17,6 +37,7 @@ function mimeToWhatsAppType(mimeType) {
   return 'DOCUMENT';
 }
 
+// POST – server-side upload (kept for small files < 4.5 MB)
 export async function POST(request) {
   try {
     const access = await resolveBranchAccess(request, PERMISSIONS.COLLECT_PAYMENT);
@@ -33,10 +54,6 @@ export async function POST(request) {
     const originalName = file.name || 'media';
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    if (buffer.byteLength > MAX_BYTES)
-      return NextResponse.json({ error: `File too large (max ${MAX_BYTES / 1024 / 1024} MB)` }, { status: 413 });
-
-    // Upload to ImageKit under a per-branch folder for isolation
     const result = await imagekit.upload({
       file: buffer,
       fileName: `${Date.now()}-${originalName.replace(/[^a-z0-9._-]/gi, '_')}`,
