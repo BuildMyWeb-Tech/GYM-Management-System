@@ -34,6 +34,7 @@ export async function GET(request) {
         member: { select: { fullName: true } },
       },
       orderBy: { checkIn: 'asc' },
+      take: 20000,
     });
 
     // Daily trend

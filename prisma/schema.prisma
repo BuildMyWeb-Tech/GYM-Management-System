@@ -189,6 +189,7 @@ model Member {
   @@index([branchId])
   @@index([phone])
   @@index([status])
+  @@index([createdAt])
 }
 // ─── MEMBERSHIP (the subscription instance) ────────────────────────────────────
 
@@ -213,6 +214,8 @@ model Membership {
   @@index([branchId])
   @@index([status])
   @@index([expiryDate])
+  @@index([branchId, status])
+  @@index([branchId, status, expiryDate])
 }
 
 // ─── ATTENDANCE (new) ───────────────────────────────────────────────────────────
@@ -238,6 +241,7 @@ model Attendance {
   @@index([branchId])
   @@index([checkIn])
   @@index([verified])
+  @@index([branchId, checkIn])
 }
 
 // ─── BIOMETRIC DEVICE (new — maps hardware to branch) ──────────────────────────
@@ -286,6 +290,8 @@ model Order {
   @@index([memberId])
   @@index([status])
   @@index([createdAt])
+  @@index([branchId, isPaid])
+  @@index([branchId, createdAt])
 }
 
 // ─── ORDER ITEM (plan / PT package / supplement line item) ─────────────────────
@@ -347,6 +353,7 @@ model NotificationLog {
   @@index([type])
   @@index([status])
   @@index([createdAt])
+  @@index([branchId, type, createdAt])
 }
 
 // ─── WHATSAPP WORKER MODELS ───────────────────────────────────────────────────

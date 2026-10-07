@@ -25,18 +25,13 @@ export async function GET(request) {
 
     const now = new Date();
 
-    // Members with at least one past membership but none currently active
-    const activeMemberIds = (
-      await prisma.membership.findMany({
-        where: { branchId, status: 'ACTIVE', expiryDate: { gte: now } },
-        select: { memberId: true },
-      })
-    ).map((m) => m.memberId);
-
+    // Members with at least one past membership but none currently active.
+    // Use NOT + nested relation filter so Prisma generates a NOT EXISTS subquery
+    // instead of loading all active member IDs into memory and sending a large IN list.
     const where = {
       branchId,
-      id: { notIn: activeMemberIds },
       memberships: { some: {} },
+      NOT: { memberships: { some: { status: 'ACTIVE', expiryDate: { gte: now } } } },
       ...(q ? { OR: [{ fullName: { contains: q, mode: 'insensitive' } }, { phone: { contains: q } }] } : {}),
     };
 

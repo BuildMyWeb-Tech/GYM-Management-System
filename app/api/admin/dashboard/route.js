@@ -77,16 +77,19 @@ export async function GET(request) {
       cursor.setDate(cursor.getDate() + 1);
     }
 
-    // Top branches with names
-    const topBranches = await Promise.all(
-      topBranchesRaw.map(async (t) => {
-        const branch = await prisma.branch.findUnique({
-          where: { id: t.branchId },
-          select: { name: true },
-        });
-        return { name: branch?.name || 'Unknown', revenue: round2(t._sum.total || 0) };
-      })
-    );
+    // Top branches — one batch query instead of one per branch
+    const topBranchIds = topBranchesRaw.map((t) => t.branchId);
+    const topBranchRows = topBranchIds.length
+      ? await prisma.branch.findMany({
+          where: { id: { in: topBranchIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const branchNameMap = Object.fromEntries(topBranchRows.map((b) => [b.id, b.name]));
+    const topBranches = topBranchesRaw.map((t) => ({
+      name: branchNameMap[t.branchId] || 'Unknown',
+      revenue: round2(t._sum.total || 0),
+    }));
 
     // Branch status pie
     const branchStatusPie = branchStatusCounts.map((b) => ({ name: b.status, value: b._count.id }));

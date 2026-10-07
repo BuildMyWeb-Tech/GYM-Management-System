@@ -51,14 +51,21 @@ export async function GET(request, { params }) {
       monthRanges.push({ start, end, label: monthLabel(start) });
     }
 
-    const attendanceMonthly = await Promise.all(
-      monthRanges.map(async (r) => {
-        const count = await prisma.attendance.count({
-          where: { memberId: id, checkIn: { gte: r.start, lt: r.end } },
-        });
-        return { label: r.label, count };
-      })
-    );
+    // Single query covering the full 6-month window; bucket in JS to avoid 6 round-trips
+    const allMonthAttendance = await prisma.attendance.findMany({
+      where: { memberId: id, checkIn: { gte: monthRanges[0].start, lt: monthRanges[5].end } },
+      select: { checkIn: true },
+    });
+    const monthBuckets = {};
+    for (const a of allMonthAttendance) {
+      const d = new Date(a.checkIn);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      monthBuckets[key] = (monthBuckets[key] || 0) + 1;
+    }
+    const attendanceMonthly = monthRanges.map((r) => ({
+      label: r.label,
+      count: monthBuckets[`${r.start.getFullYear()}-${r.start.getMonth()}`] || 0,
+    }));
 
     // Daily attendance duration — last 30 days
     const rangeStart = new Date(now);

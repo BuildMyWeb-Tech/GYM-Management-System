@@ -32,6 +32,7 @@ export async function GET(request) {
       },
       select: { total: true, commissionAmt: true, createdAt: true },
       orderBy: { createdAt: 'asc' },
+      take: 10000,
     });
 
     const buckets = {};

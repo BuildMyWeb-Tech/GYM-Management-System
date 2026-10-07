@@ -1,12 +1,14 @@
 import prisma from '@/lib/prisma';
 
-/**
- * Verifies userId owns an ACTIVE branch.
- * Returns branchId string | null.
- * Throws on DB error so callers can return 500 instead of silent 401.
- */
+// Cache owner→branchId mapping to avoid a DB round-trip on every API call
+const _cache = new Map();
+const CACHE_TTL = 2 * 60 * 1000; // 2 minutes (short enough to pick up status changes)
+
 const authBranchOwner = async (userId) => {
   if (!userId) return null;
+
+  const cached = _cache.get(userId);
+  if (cached && Date.now() - cached.at < CACHE_TTL) return cached.branchId;
 
   try {
     const user = await prisma.user.findUnique({
@@ -14,21 +16,18 @@ const authBranchOwner = async (userId) => {
       select: {
         id: true,
         branch: {
-          select: {
-            id: true,
-            status: true,
-            isActive: true,
-          },
+          select: { id: true, status: true, isActive: true },
         },
       },
     });
 
-    if (!user || !user.branch) return null;
+    const branchId =
+      user?.branch?.status === 'ACTIVE' && user.branch.isActive
+        ? user.branch.id
+        : null;
 
-    // Must be ACTIVE status (set by admin after approval)
-    if (user.branch.status !== 'ACTIVE' || !user.branch.isActive) return null;
-
-    return user.branch.id;
+    _cache.set(userId, { branchId, at: Date.now() });
+    return branchId;
   } catch (error) {
     console.error('authBranchOwner DB error:', error);
     throw new Error('DB_ERROR_AUTH_BRANCH_OWNER');
