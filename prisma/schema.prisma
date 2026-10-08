@@ -345,8 +345,9 @@ model NotificationLog {
   broadcastId  String?
   createdAt    DateTime             @default(now())
 
-  member       Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  broadcast    BroadcastCampaign?   @relation(fields: [broadcastId], references: [id])
+  member        Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  broadcast     BroadcastCampaign?   @relation(fields: [broadcastId], references: [id])
+  outboxMessages MessageOutbox[]
 
   @@index([memberId])
   @@index([branchId])
@@ -408,11 +409,13 @@ model MessageOutbox {
   broadcastRecipientIndex Int?
   sentMessageId           String?
   errorMessage            String?
+  notificationLogId       String?
   createdAt               DateTime        @default(now())
   updatedAt               DateTime        @updatedAt
 
   account                 WhatsAppAccount    @relation(fields: [branchId], references: [branchId], onDelete: Cascade)
   broadcast               BroadcastCampaign? @relation(fields: [broadcastId], references: [id])
+  notificationLog         NotificationLog?   @relation(fields: [notificationLogId], references: [id], onDelete: SetNull)
 
   @@index([branchId, status, scheduledAt])
   @@index([broadcastId])

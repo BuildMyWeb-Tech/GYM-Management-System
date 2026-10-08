@@ -103,6 +103,14 @@ export class OutboxConsumer {
       await markOutboxSent(job.id, sentMessageId || null);
       this.log.debug({ jid, broadcastId: job.broadcastId }, 'Message sent');
 
+      if (job.notificationLogId) {
+        const { prisma } = await import('./repository.js');
+        await prisma.notificationLog.update({
+          where: { id: job.notificationLogId },
+          data: { status: 'SENT', sentAt: new Date(), messageRef: sentMessageId || null },
+        }).catch(e => this.log.warn({ e }, 'notificationLog SENT update failed'));
+      }
+
       if (job.broadcastId && job.broadcastRecipientIndex != null) {
         await updateBroadcastRecipient(job.broadcastId, job.broadcastRecipientIndex, {
           status: 'sent', sentAt: new Date().toISOString(), sentMessageId,
@@ -114,6 +122,14 @@ export class OutboxConsumer {
       const exhaust = permanent ? job.maxAttempts : attempts;
       await markOutboxFailed(job.id, err.message, exhaust, job.maxAttempts);
       this.log.warn({ err, jid, permanent }, 'Message send failed');
+
+      if (job.notificationLogId && exhaust >= job.maxAttempts) {
+        const { prisma } = await import('./repository.js');
+        await prisma.notificationLog.update({
+          where: { id: job.notificationLogId },
+          data: { status: 'FAILED', errorMessage: err.message },
+        }).catch(e => this.log.warn({ e }, 'notificationLog FAILED update failed'));
+      }
 
       if (job.broadcastId && job.broadcastRecipientIndex != null) {
         await updateBroadcastRecipient(job.broadcastId, job.broadcastRecipientIndex, {

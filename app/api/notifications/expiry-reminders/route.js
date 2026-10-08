@@ -76,7 +76,7 @@ export async function GET(request) {
         expiryDate: ms.expiryDate,
         daysUntilExpiry: daysLeft,
         lastNotification: lastLog
-          ? { status: lastLog.status, sentAt: lastLog.sentAt || lastLog.createdAt }
+          ? { status: lastLog.status, sentAt: lastLog.sentAt || lastLog.createdAt, method: lastLog.metadata?.method || null }
           : null,
       });
     }
@@ -121,15 +121,24 @@ export async function POST(request) {
     const daysLeft = Math.max(0, Math.ceil((new Date(membership.expiryDate) - new Date()) / 86400000));
     const message = buildExpiryReminderMessage(member.fullName, membership.plan.name, membership.expiryDate, daysLeft, branch?.name);
 
-    const result = await sendBranchWhatsApp(branchId, member.phone, message);
-
-    await prisma.notificationLog.create({
+    const log = await prisma.notificationLog.create({
       data: {
         memberId: member.id,
         branchId,
         channel: 'WHATSAPP',
         type: 'EXPIRY_REMINDER',
-        status: result.method === 'baileys' ? 'PENDING' : (result.success ? 'SENT' : 'PENDING'),
+        status: 'PENDING',
+        metadata: { daysUntilExpiry: daysLeft, membershipId, method: 'queued' },
+      },
+    });
+
+    const result = await sendBranchWhatsApp(branchId, member.phone, message, log.id);
+
+    const logStatus = result.method === 'baileys' ? 'PENDING' : (result.success ? 'SENT' : 'FAILED');
+    await prisma.notificationLog.update({
+      where: { id: log.id },
+      data: {
+        status: logStatus,
         messageRef: result.messageId || null,
         errorMessage: result.error || null,
         sentAt: result.success && result.method !== 'baileys' ? new Date() : null,

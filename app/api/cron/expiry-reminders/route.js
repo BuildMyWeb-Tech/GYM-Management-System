@@ -68,13 +68,20 @@ async function processForBranch(branchId, branchName, daysAhead, windowStart, wi
       branchName,
     );
 
-    let logStatus = 'PENDING';
-    let messageRef = null;
-    let errorMessage = null;
-    let method = 'queued';
+    // Create log first so we can link the outbox entry back to it
+    const log = await prisma.notificationLog.create({
+      data: {
+        memberId: member.id,
+        branchId,
+        channel: 'WHATSAPP',
+        type: 'EXPIRY_REMINDER',
+        status: 'PENDING',
+        metadata: { daysUntilExpiry: daysAhead, membershipId: membership.id, method: 'queued' },
+      },
+    });
 
     if (baileysConnected) {
-      // Route through this gym's WhatsApp — queue to MessageOutbox; worker sends it.
+      // Route through this gym's WhatsApp — queue to MessageOutbox; worker sends it and updates the log.
       await prisma.messageOutbox.create({
         data: {
           branchId,
@@ -83,35 +90,31 @@ async function processForBranch(branchId, branchName, daysAhead, windowStart, wi
           payload: { text: message },
           status: 'PENDING',
           scheduledAt: new Date(),
+          notificationLogId: log.id,
         },
       });
-      logStatus = 'PENDING';
-      method = 'baileys';
+      await prisma.notificationLog.update({
+        where: { id: log.id },
+        data: { metadata: { daysUntilExpiry: daysAhead, membershipId: membership.id, method: 'baileys' } },
+      });
       results.sent++;
     } else {
       // No Baileys connection — fall back to shared Cloud API
       const sendResult = await sendWhatsAppMessage(member.phone, message);
-      logStatus = sendResult.success ? 'SENT' : 'PENDING';
-      messageRef = sendResult.messageId || null;
-      errorMessage = sendResult.error || null;
-      method = sendResult.success ? 'api' : 'api_error';
+      const logStatus = sendResult.success ? 'SENT' : 'FAILED';
+      await prisma.notificationLog.update({
+        where: { id: log.id },
+        data: {
+          status: logStatus,
+          messageRef: sendResult.messageId || null,
+          errorMessage: sendResult.error || null,
+          sentAt: sendResult.success ? new Date() : null,
+          metadata: { daysUntilExpiry: daysAhead, membershipId: membership.id, method: sendResult.success ? 'api' : 'api_error' },
+        },
+      });
       if (sendResult.success) results.sent++;
       else results.failed++;
     }
-
-    await prisma.notificationLog.create({
-      data: {
-        memberId: member.id,
-        branchId,
-        channel: 'WHATSAPP',
-        type: 'EXPIRY_REMINDER',
-        status: logStatus,
-        messageRef,
-        errorMessage,
-        sentAt: logStatus === 'SENT' ? new Date() : null,
-        metadata: { daysUntilExpiry: daysAhead, membershipId: membership.id, method },
-      },
-    });
   }
 }
 
