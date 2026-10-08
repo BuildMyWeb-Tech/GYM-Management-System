@@ -42,7 +42,7 @@ const Navbar = () => {
                             <Link href="/about" className="hover:text-green-600 transition-colors font-medium">About</Link>
                             <Link href="/contact" className="hover:text-green-600 transition-colors font-medium">Contact</Link>
 
-                            <Link href="/cart" className="relative flex items-center gap-2 text-slate-600 hover:text-green-600 transition-colors font-medium group">
+                            {/* <Link href="/cart" className="relative flex items-center gap-2 text-slate-600 hover:text-green-600 transition-colors font-medium group">
                                 <div className="relative">
                                     <ShoppingCart size={20} />
                                     {cartCount > 0 && (
@@ -52,7 +52,7 @@ const Navbar = () => {
                                     )}
                                 </div>
                                 Cart
-                            </Link>
+                            </Link> */}
 
                             {!user ? (
                                 <button onClick={openSignIn}
