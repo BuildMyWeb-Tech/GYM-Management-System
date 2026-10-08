@@ -21,12 +21,15 @@ function startOfDayIST(date) {
  * Routes through the branch's own Baileys connection if active; falls back to Cloud API.
  */
 async function processForBranch(branchId, branchName, daysAhead, windowStart, windowEnd, todayStart, results) {
-  // Check this branch's Baileys connection state
+  // Check this branch's Baileys connection state + worker liveness
   const waAccount = await prisma.whatsAppAccount.findUnique({
     where: { branchId },
-    select: { connectionState: true },
+    select: { connectionState: true, lastHeartbeatAt: true },
   });
-  const baileysConnected = waAccount?.connectionState === 'CONNECTED';
+  const workerAlive = waAccount?.lastHeartbeatAt
+    ? Date.now() - new Date(waAccount.lastHeartbeatAt).getTime() < 2 * 60 * 1000
+    : false;
+  const baileysConnected = waAccount?.connectionState === 'CONNECTED' && workerAlive;
 
   const expiringMemberships = await prisma.membership.findMany({
     where: {

@@ -5,11 +5,8 @@
 import prisma from '@/lib/prisma';
 import { resolveBranchAccess } from '@/lib/resolveBranchAccess';
 import { PERMISSIONS } from '@/middlewares/authEmployee';
-import {
-  sendWhatsAppMessage,
-  buildFallbackUrl,
-  buildPaymentReminderMessage,
-} from '@/lib/whatsappServer';
+import { buildPaymentReminderMessage } from '@/lib/whatsappServer';
+import { sendBranchWhatsApp, isBranchWAReady } from '@/lib/sendBranchWhatsApp';
 import { NextResponse } from 'next/server';
 
 export async function GET(request) {
@@ -25,9 +22,6 @@ export async function GET(request) {
 
     const now = new Date();
 
-    // Members with at least one past membership but none currently active.
-    // Use NOT + nested relation filter so Prisma generates a NOT EXISTS subquery
-    // instead of loading all active member IDs into memory and sending a large IN list.
     const where = {
       branchId,
       memberships: { some: {} },
@@ -35,7 +29,7 @@ export async function GET(request) {
       ...(q ? { OR: [{ fullName: { contains: q, mode: 'insensitive' } }, { phone: { contains: q } }] } : {}),
     };
 
-    const [total, members] = await Promise.all([
+    const [total, members, waAccount] = await Promise.all([
       prisma.member.count({ where }),
       prisma.member.findMany({
         where,
@@ -50,7 +44,13 @@ export async function GET(request) {
         skip: (page - 1) * limit,
         take: limit,
       }),
+      prisma.whatsAppAccount.findUnique({
+        where: { branchId },
+        select: { connectionState: true, lastHeartbeatAt: true },
+      }),
     ]);
+
+    const isWhatsAppReady = isBranchWAReady(waAccount);
 
     // Fetch last payment-due notification for each member
     const memberIds = members.map((m) => m.id);
@@ -90,6 +90,7 @@ export async function GET(request) {
     return NextResponse.json({
       members: enriched,
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      isWhatsAppReady,
     });
   } catch (error) {
     console.error('GET /api/notifications/pending-renewals error:', error);
@@ -135,7 +136,7 @@ export async function POST(request) {
       branch?.name
     );
 
-    const result = await sendWhatsAppMessage(member.phone, message);
+    const result = await sendBranchWhatsApp(branchId, member.phone, message);
 
     await prisma.notificationLog.create({
       data: {
@@ -143,20 +144,18 @@ export async function POST(request) {
         branchId,
         channel: 'WHATSAPP',
         type: 'PAYMENT_DUE',
-        status: result.success ? 'SENT' : 'PENDING',
+        status: result.method === 'baileys' ? 'PENDING' : (result.success ? 'SENT' : 'PENDING'),
         messageRef: result.messageId || null,
         errorMessage: result.error || null,
-        sentAt: result.success ? new Date() : null,
-        metadata: { daysSinceExpiry: daysSince },
+        sentAt: result.success && result.method !== 'baileys' ? new Date() : null,
+        metadata: { daysSinceExpiry: daysSince, method: result.method },
       },
     });
 
-    if (result.method === 'not_configured') {
-      return NextResponse.json({ success: false, method: 'link', fallbackUrl: buildFallbackUrl(member.phone, message) });
-    }
-    if (!result.success) return NextResponse.json({ success: false, error: result.error }, { status: 500 });
+    if (!result.success)
+      return NextResponse.json({ success: false, method: result.method, error: result.error }, { status: result.method === 'not_configured' ? 503 : 500 });
 
-    return NextResponse.json({ success: true, method: 'api' });
+    return NextResponse.json({ success: true, method: result.method });
   } catch (error) {
     console.error('POST /api/notifications/pending-renewals error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

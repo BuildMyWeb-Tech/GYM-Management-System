@@ -1,15 +1,12 @@
 // app/api/notifications/expiry-reminders/route.js
-// GET  – list memberships expiring in the next 7 days with last reminder status
+// GET  – list memberships expiring in the next 4 days with last reminder status
 // POST – send / resend a WhatsApp expiry reminder for a specific membership
 
 import prisma from '@/lib/prisma';
 import { resolveBranchAccess } from '@/lib/resolveBranchAccess';
 import { PERMISSIONS } from '@/middlewares/authEmployee';
-import {
-  sendWhatsAppMessage,
-  buildFallbackUrl,
-  buildExpiryReminderMessage,
-} from '@/lib/whatsappServer';
+import { buildExpiryReminderMessage } from '@/lib/whatsappServer';
+import { sendBranchWhatsApp, isBranchWAReady } from '@/lib/sendBranchWhatsApp';
 import { NextResponse } from 'next/server';
 
 function startOfToday() {
@@ -28,16 +25,24 @@ export async function GET(request) {
     const in4Days = new Date(today);
     in4Days.setDate(in4Days.getDate() + 4);
 
-    const memberships = await prisma.membership.findMany({
-      where: { branchId, status: 'ACTIVE', expiryDate: { gte: today, lt: in4Days } },
-      include: {
-        member: { select: { id: true, fullName: true, phone: true } },
-        plan: { select: { name: true } },
-      },
-      orderBy: { expiryDate: 'asc' },
-    });
+    const [memberships, waAccount] = await Promise.all([
+      prisma.membership.findMany({
+        where: { branchId, status: 'ACTIVE', expiryDate: { gte: today, lt: in4Days } },
+        include: {
+          member: { select: { id: true, fullName: true, phone: true } },
+          plan: { select: { name: true } },
+        },
+        orderBy: { expiryDate: 'asc' },
+      }),
+      prisma.whatsAppAccount.findUnique({
+        where: { branchId },
+        select: { connectionState: true, lastHeartbeatAt: true },
+      }),
+    ]);
 
-    if (memberships.length === 0) return NextResponse.json({ groups: [], total: 0 });
+    const isWhatsAppReady = isBranchWAReady(waAccount);
+
+    if (memberships.length === 0) return NextResponse.json({ groups: [], total: 0, isWhatsAppReady });
 
     const memberIds = [...new Set(memberships.map((m) => m.memberId))];
     const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
@@ -88,7 +93,7 @@ export async function GET(request) {
         };
       });
 
-    return NextResponse.json({ groups, total: memberships.length });
+    return NextResponse.json({ groups, total: memberships.length, isWhatsAppReady });
   } catch (error) {
     console.error('GET /api/notifications/expiry-reminders error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -116,7 +121,7 @@ export async function POST(request) {
     const daysLeft = Math.max(0, Math.ceil((new Date(membership.expiryDate) - new Date()) / 86400000));
     const message = buildExpiryReminderMessage(member.fullName, membership.plan.name, membership.expiryDate, daysLeft, branch?.name);
 
-    const result = await sendWhatsAppMessage(member.phone, message);
+    const result = await sendBranchWhatsApp(branchId, member.phone, message);
 
     await prisma.notificationLog.create({
       data: {
@@ -124,22 +129,18 @@ export async function POST(request) {
         branchId,
         channel: 'WHATSAPP',
         type: 'EXPIRY_REMINDER',
-        status: result.success ? 'SENT' : 'PENDING',
+        status: result.method === 'baileys' ? 'PENDING' : (result.success ? 'SENT' : 'PENDING'),
         messageRef: result.messageId || null,
         errorMessage: result.error || null,
-        sentAt: result.success ? new Date() : null,
-        metadata: { daysUntilExpiry: daysLeft, membershipId },
+        sentAt: result.success && result.method !== 'baileys' ? new Date() : null,
+        metadata: { daysUntilExpiry: daysLeft, membershipId, method: result.method },
       },
     });
 
-    if (result.method === 'not_configured') {
-      const fallbackUrl = buildFallbackUrl(member.phone, message);
-      return NextResponse.json({ success: false, method: 'link', fallbackUrl });
-    }
+    if (!result.success)
+      return NextResponse.json({ success: false, method: result.method, error: result.error }, { status: result.method === 'not_configured' ? 503 : 500 });
 
-    if (!result.success) return NextResponse.json({ success: false, error: result.error }, { status: 500 });
-
-    return NextResponse.json({ success: true, method: 'api', messageId: result.messageId });
+    return NextResponse.json({ success: true, method: result.method });
   } catch (error) {
     console.error('POST /api/notifications/expiry-reminders error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
