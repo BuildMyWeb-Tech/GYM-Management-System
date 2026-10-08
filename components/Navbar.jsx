@@ -40,7 +40,6 @@ const Navbar = () => {
                                 {pathname === '/' && <span className="absolute -bottom-1.5 left-0 w-full h-0.5 bg-green-600 rounded-full"></span>}
                             </Link>
                             <Link href="/about" className="hover:text-green-600 transition-colors font-medium">About</Link>
-                            <Link href="/pricing" className="hover:text-green-600 transition-colors font-medium">Pricing</Link>
                             <Link href="/contact" className="hover:text-green-600 transition-colors font-medium">Contact</Link>
 
                             <Link href="/cart" className="relative flex items-center gap-2 text-slate-600 hover:text-green-600 transition-colors font-medium group">

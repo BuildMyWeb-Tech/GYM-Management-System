@@ -33,7 +33,6 @@ const Footer = () => {
       title: 'GET STARTED',
       links: [
         { text: 'Help Center', path: '/contact', icon: HelpCircle },
-        { text: 'Pricing', path: '/pricing', icon: FileText },
         { text: 'Register a Branch', path: '/create-store', icon: Building2 },
       ],
     },
