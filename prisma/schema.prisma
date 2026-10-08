@@ -281,7 +281,7 @@ model Order {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  member         Member          @relation(fields: [memberId], references: [id])
+  member         Member          @relation(fields: [memberId], references: [id], onDelete: Cascade)
   branch         Branch          @relation(fields: [branchId], references: [id])
   orderItems     OrderItem[]
   timeline       OrderTimeline[]
