@@ -66,7 +66,7 @@ const ALL_LINKS = [
     permission: null,
     ownerOnly: true,
   },
-  { name: 'Devices', href: '/store/devices', icon: Fingerprint, permission: null, ownerOnly: true },
+  // { name: 'Devices', href: '/store/devices', icon: Fingerprint, permission: null, ownerOnly: true },
   {
     name: 'Reminders',
     href: '/store/reminders',
