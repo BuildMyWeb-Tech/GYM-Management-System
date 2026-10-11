@@ -27,23 +27,32 @@ const PERMISSION_META = {
   [PERMISSIONS.MANAGE_MEMBERS]: {
     label: 'Manage Members',
     desc: 'Register, edit, and manage member records',
+    pages: ['Members'],
   },
   [PERMISSIONS.MARK_ATTENDANCE]: {
     label: 'Mark Attendance',
     desc: 'Check-in / check-out members, corrections',
+    pages: ['Attendance'],
   },
   [PERMISSIONS.COLLECT_PAYMENT]: {
     label: 'Collect Payment',
-    desc: 'Checkout, view payments and orders',
+    desc: 'Checkout, payments, orders, and broadcast messages',
+    pages: ['Checkout', 'Payments', 'Broadcast'],
   },
-  [PERMISSIONS.MANAGE_MEMBERSHIPS]: { label: 'Manage Plans', desc: 'Create/edit membership plans' },
+  [PERMISSIONS.MANAGE_MEMBERSHIPS]: {
+    label: 'Manage Plans',
+    desc: 'Create/edit membership plans and categories',
+    pages: ['Plans'],
+  },
   [PERMISSIONS.VIEW_REPORTS]: {
     label: 'View Reports',
-    desc: 'Access attendance and revenue reports',
+    desc: 'Access reports, reminders, and closing report',
+    pages: ['Reports', 'Reminders', 'Closing Report'],
   },
   [PERMISSIONS.MANAGE_BRANCH_SETTINGS]: {
     label: 'Branch Settings',
-    desc: 'Update branch profile and settings',
+    desc: 'Branch profile, settings, and WhatsApp connection',
+    pages: ['WhatsApp Connect'],
   },
 };
 const ALL_PERMISSIONS = Object.values(PERMISSIONS);
@@ -418,6 +427,11 @@ export default function EmployeesPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-800">{meta.label}</p>
                         <p className="text-xs text-slate-500">{meta.desc}</p>
+                        {meta.pages && (
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {meta.pages.join(' · ')}
+                          </p>
+                        )}
                       </div>
                     </div>
                   );
