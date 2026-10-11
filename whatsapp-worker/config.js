@@ -1,7 +1,7 @@
 // whatsapp-worker/config.js
 // Environment variable parsing and validation.
 
-import { randomUUID } from 'crypto';
+import { hostname } from 'os';
 
 function required(name) {
   const val = process.env[name];
@@ -19,8 +19,9 @@ export const config = {
   // AES-256-GCM key for encrypting Baileys session (64 hex chars = 32 bytes)
   sessionEncryptionKey: required('WHATSAPP_SESSION_ENCRYPTION_KEY'),
 
-  // Stable worker ID — set to a constant on production to survive restarts
-  workerId: optional('WORKER_ID', `worker-${process.pid}`),
+  // Stable worker ID — hostname is stable across restarts on the same Render dyno.
+  // Set WORKER_ID env var explicitly for extra safety (e.g. "wa-worker-1").
+  workerId: optional('WORKER_ID', `worker-${hostname()}`),
 
   // Polling intervals (ms)
   supervisorIntervalMs: parseInt(optional('SALON_DISCOVERY_INTERVAL_MS', '60000')),

@@ -10,8 +10,11 @@
   },
   "dependencies": {
     "@hapi/boom": "^10.0.1",
+    "@prisma/client": "*",
     "@whiskeysockets/baileys": "^6.7.18",
+    "dotenv": "^16.4.5",
     "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
     "qrcode": "^1.5.4"
   },
   "engines": {

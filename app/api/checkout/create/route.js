@@ -9,6 +9,8 @@ import {
   activateMembershipsForOrder,
   round2,
 } from '@/lib/checkoutHelpers';
+import { sendBranchWhatsApp } from '@/lib/sendBranchWhatsApp';
+import { buildCheckoutReceiptMessage } from '@/lib/whatsappServer';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
@@ -90,6 +92,17 @@ export async function POST(request) {
     );
 
     if (isImmediate) {
+      // Fire-and-forget WhatsApp receipt — order succeeds regardless of WA status
+      if (member.phone) {
+        const planNames = order.orderItems.map((i) => i.name).join(', ');
+        const message = buildCheckoutReceiptMessage(
+          member.fullName, planNames, total, paymentMethod, order.id, branch?.name
+        );
+        sendBranchWhatsApp(branchId, member.phone, message).catch((err) =>
+          console.error('Checkout WA receipt failed:', err.message)
+        );
+      }
+
       return NextResponse.json(
         { message: 'Order completed', order, requiresPayment: false },
         { status: 201 }

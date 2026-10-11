@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { getBranchAuthHeader } from '@/lib/authHeader';
-import { sendWhatsAppConfirmation } from '@/lib/whatsapp';
 import Loading from '@/components/Loading';
 import { Search, Check, Plus, Trash2, CreditCard, ShoppingCart, MessageCircle, Calendar, Info } from 'lucide-react';
 
@@ -51,18 +50,13 @@ export default function Checkout({ basePath }) {
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [activeMembership, setActiveMembership] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [branchWhatsapp, setBranchWhatsapp] = useState('');
 
   useEffect(() => {
     (async () => {
       try {
         const headers = await getBranchAuthHeader(getToken);
-        const [planRes, settingsRes] = await Promise.all([
-          axios.get('/api/membership-plan', { headers, params: { status: 'ACTIVE' } }),
-          axios.get('/api/store/settings', { headers }),
-        ]);
+        const planRes = await axios.get('/api/membership-plan', { headers, params: { status: 'ACTIVE' } });
         setPlans(planRes.data.plans);
-        setBranchWhatsapp(settingsRes.data.settings?.whatsappNumber || settingsRes.data.settings?.phone || '');
       } catch (error) {
         toast.error(error?.response?.data?.error || error.message);
       } finally {
@@ -136,10 +130,6 @@ export default function Checkout({ basePath }) {
       const { data } = await axios.post('/api/checkout/create', payload, { headers });
 
       toast.success('Payment completed successfully');
-
-      // Auto-open WhatsApp confirmation — requires the receptionist to tap Send once inside WhatsApp
-      sendWhatsAppConfirmation(data.order, branchWhatsapp);
-
       router.push(`${basePath}/orders/${data.order.id}`);
     } catch (error) {
       toast.error(error?.response?.data?.error || error.message);
@@ -286,7 +276,7 @@ export default function Checkout({ basePath }) {
           </button>
 
           <p className="text-xs text-slate-400 mt-3 flex items-center gap-1.5">
-            <MessageCircle size={12} /> A WhatsApp confirmation will open automatically after payment
+            <MessageCircle size={12} /> WhatsApp receipt sent automatically to member
           </p>
         </div>
       </div>

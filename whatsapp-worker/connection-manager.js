@@ -44,6 +44,7 @@ export class ConnectionManager {
   async forceConnect() {
     if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
     this.reconnectAttempts = 0;
+    this.running = true; // re-arm after a forceDisconnect
     await this._acquireAndConnect();
   }
 
@@ -102,6 +103,9 @@ export class ConnectionManager {
           this.oc.setActive(true);
         } else {
           this.oc.setActive(false);
+          if (state === 'RECONNECTING' && this.running) {
+            this._scheduleReconnect();
+          }
         }
       });
 
@@ -121,13 +125,7 @@ export class ConnectionManager {
           qrDataUri: null, workerInstanceId: null,
         });
         this.oc.setActive(false);
-        // Don't reconnect after logout
-      });
-
-      this.provider.on('state_changed', async (state) => {
-        if (state === 'RECONNECTING' && this.running) {
-          this._scheduleReconnect();
-        }
+        // Don't auto-reconnect after explicit logout
       });
 
       await this.provider.connect();

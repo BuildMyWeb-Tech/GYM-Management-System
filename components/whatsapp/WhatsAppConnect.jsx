@@ -124,12 +124,12 @@ export default function WhatsAppConnect() {
             </div>
           )}
 
-          {/* {showWorkerOffline && (
+          {showWorkerOffline && (
             <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
               <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
-              <span>WhatsApp worker is offline. Start the server with <code className="font-mono bg-amber-100 px-1 rounded">npm run dev:full</code> (local) or deploy with <code className="font-mono bg-amber-100 px-1 rounded">node server.mjs</code>.</span>
+              <span>WhatsApp worker is offline. Check your Render deployment and ensure the worker service is running.</span>
             </div>
-          )} */}
+          )}
 
           {status?.lastError && state === 'ERROR' && (
             <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
@@ -156,20 +156,31 @@ export default function WhatsAppConnect() {
                 Disconnect
               </button>
             ) : (
-              <button
-                onClick={connect}
-                disabled={actionLoading || isWorking}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 text-white hover:bg-green-700 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
-              >
-                {actionLoading || isWorking ? (
-                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <Wifi size={16} />
+              <>
+                <button
+                  onClick={connect}
+                  disabled={actionLoading || state === 'STARTING'}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 text-white hover:bg-green-700 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+                >
+                  {actionLoading || state === 'STARTING' ? (
+                    <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Wifi size={16} />
+                  )}
+                  {state === 'QR_REQUIRED' ? 'Refresh QR' : state === 'RECONNECTING' ? 'Reconnect' : 'Connect'}
+                </button>
+                {(isWorking || state === 'ERROR') && (
+                  <button
+                    onClick={disconnect}
+                    disabled={actionLoading}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+                  >
+                    <WifiOff size={16} />
+                    Cancel
+                  </button>
                 )}
-                {isWorking ? 'Connecting…' : 'Connect'}
-              </button>
+              </>
             )}
-            
           </div>
         </div>
 
