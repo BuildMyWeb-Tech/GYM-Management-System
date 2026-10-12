@@ -131,7 +131,7 @@ export default function WhatsAppConnect() {
             </div>
           )}
 
-          {status?.lastError && state === 'ERROR' && (
+          {status?.lastError && (state === 'ERROR' || state === 'QR_REQUIRED') && (
             <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
               {status.lastError}
             </div>

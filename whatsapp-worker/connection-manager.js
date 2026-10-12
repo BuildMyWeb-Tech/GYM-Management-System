@@ -128,6 +128,22 @@ export class ConnectionManager {
         // Don't auto-reconnect after explicit logout
       });
 
+      this.provider.on('qr_failed', async ({ statusCode } = {}) => {
+        this.log.warn({ statusCode }, 'QR scan failed / rejected — clearing session for fresh start');
+        await clearSession(this.branchId);
+        await upsertAccount(this.branchId, {
+          connectionState: 'QR_REQUIRED', status: 'disconnected',
+          qrDataUri: null, lastError: 'QR scan was rejected. Please click Refresh QR and scan again.',
+        });
+        this.oc.setActive(false);
+        // Disconnect the provider and reconnect fresh after a short delay
+        if (this.provider) { await this.provider.disconnect(); this.provider = null; }
+        if (this.running) {
+          this.reconnectAttempts = 0;
+          this.reconnectTimer = setTimeout(() => this._connect(), 2000);
+        }
+      });
+
       await this.provider.connect();
     } catch (err) {
       this.log.error({ err }, 'Connection error');

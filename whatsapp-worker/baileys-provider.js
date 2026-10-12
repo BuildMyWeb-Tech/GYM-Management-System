@@ -48,6 +48,7 @@ export class BaileysProvider extends EventEmitter {
   async connect() {
     if (this.sock) await this.disconnect();
     this.authState = await useDbAuthState(this.branchId);
+    this._wasAuthenticated = false; // track whether we reached 'open' this session
 
     const { version } = await fetchLatestBaileysVersion();
     this.log.debug({ version }, 'Connecting with Baileys version');
@@ -58,10 +59,13 @@ export class BaileysProvider extends EventEmitter {
         creds: this.authState.state.creds,
         keys: makeCacheableSignalKeyStore(this.authState.state.keys, noopLogger),
       },
-      browser: Browsers.ubuntu('Chrome'),
+      // macOS Desktop is accepted by WhatsApp; ubuntu/Chrome is now blocked
+      browser: Browsers.macOS('Desktop'),
       printQRInTerminal: false,
       logger: noopLogger,
       getMessage: async () => undefined,
+      syncFullHistory: false,
+      markOnlineOnConnect: false,
     });
 
     this.sock.ev.on('creds.update', this.authState.saveCreds);
@@ -79,6 +83,7 @@ export class BaileysProvider extends EventEmitter {
       }
 
       if (connection === 'open') {
+        this._wasAuthenticated = true;
         this.log.info('WhatsApp connected');
         this.emit('state_changed', 'CONNECTED');
       }
@@ -89,11 +94,17 @@ export class BaileysProvider extends EventEmitter {
           : null;
         const loggedOut = statusCode === DisconnectReason.loggedOut;
 
-        this.log.info({ statusCode, loggedOut }, 'WhatsApp connection closed');
+        this.log.info({ statusCode, loggedOut, wasAuthenticated: this._wasAuthenticated }, 'WhatsApp connection closed');
 
         if (loggedOut) {
           this.authState?.destroy();
           this.emit('logged_out');
+        } else if (!this._wasAuthenticated) {
+          // Connection closed before we ever reached 'open' — this means the QR scan
+          // was rejected ("can't link") or timed out. Destroy the partial/broken creds
+          // so the next attempt starts completely fresh.
+          this.authState?.destroy();
+          this.emit('qr_failed', { statusCode });
         } else {
           this.emit('state_changed', 'RECONNECTING');
         }
