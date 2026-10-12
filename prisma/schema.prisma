@@ -373,6 +373,9 @@ model WhatsAppAccount {
   reconnectAttempts     Int                 @default(0)
   lastError             String?
   lastConnectedAt       DateTime?
+  pairingPhone          String?
+  pairingCode           String?
+  pairingMode           Boolean             @default(false)
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
 

@@ -2,7 +2,7 @@
 // Manages the full WhatsApp connection lifecycle for one branch.
 // Handles lock acquisition, backoff, reconnect, QR display, and state persistence.
 
-import { upsertAccount, claimLock, releaseLock, clearSession } from './repository.js';
+import { upsertAccount, claimLock, releaseLock, clearSession, getPairingPhone, savePairingCode, clearPairingMode } from './repository.js';
 import { BaileysProvider } from './baileys-provider.js';
 import { childLogger } from './logger.js';
 import { config } from './config.js';
@@ -87,7 +87,32 @@ export class ConnectionManager {
   async _connect() {
     if (!this.running) return;
     try {
+      // Check if pairing-code mode is requested for this branch
+      const pairingPhone = await getPairingPhone(this.branchId);
+      if (pairingPhone) {
+        this.log.info({ pairingPhone }, 'Connecting in pairing-code mode');
+        await upsertAccount(this.branchId, {
+          connectionState: 'STARTING', status: 'disconnected',
+          lastError: null, qrDataUri: null,
+        });
+      }
+
       this.provider = new BaileysProvider(this.branchId);
+
+      this.provider.on('pairing_code', async ({ code }) => {
+        await savePairingCode(this.branchId, code);
+        await upsertAccount(this.branchId, {
+          connectionState: 'QR_REQUIRED', status: 'disconnected',
+          lastError: null,
+        });
+        this.log.info({ code }, 'Pairing code saved to DB — waiting for user to enter in WhatsApp');
+      });
+
+      this.provider.on('pairing_code_error', async ({ error }) => {
+        await upsertAccount(this.branchId, {
+          connectionState: 'ERROR', status: 'error', lastError: `Pairing code error: ${error}`,
+        });
+      });
 
       this.provider.on('state_changed', async (state) => {
         const status = state === 'CONNECTED' ? 'connected' : 'disconnected';
@@ -101,6 +126,8 @@ export class ConnectionManager {
           this.reconnectAttempts = 0;
           this.oc.provider = this.provider;
           this.oc.setActive(true);
+          // Clear pairing mode — no longer needed after successful connection
+          await clearPairingMode(this.branchId).catch(() => {});
         } else {
           this.oc.setActive(false);
           if (state === 'RECONNECTING' && this.running) {
@@ -144,7 +171,7 @@ export class ConnectionManager {
         }
       });
 
-      await this.provider.connect();
+      await this.provider.connect(pairingPhone || null);
     } catch (err) {
       this.log.error({ err }, 'Connection error');
       await upsertAccount(this.branchId, {

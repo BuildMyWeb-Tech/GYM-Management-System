@@ -33,7 +33,6 @@ export async function GET(request) {
       connected: account.connectionState === 'CONNECTED',
       connectionState: account.connectionState,
       status: account.status,
-      // Only return QR when it's needed
       qrDataUri: account.connectionState === 'QR_REQUIRED' ? account.qrDataUri : null,
       qrGeneratedAt: account.qrGeneratedAt,
       lastConnectedAt: account.lastConnectedAt,
@@ -41,6 +40,10 @@ export async function GET(request) {
       lastError: account.lastError,
       isWorkerAlive,
       reconnectAttempts: account.reconnectAttempts,
+      // Pairing code fields
+      pairingMode: account.pairingMode ?? false,
+      pairingCode: account.pairingCode ?? null,
+      pairingPhone: account.pairingPhone ?? null,
     });
   } catch (err) {
     console.error('GET /api/whatsapp/status error:', err);

@@ -95,6 +95,32 @@ export async function checkDisconnectCommand(branchId) {
   return true;
 }
 
+/** Returns the pairing phone if pairing mode is active, null otherwise. Does NOT clear it. */
+export async function getPairingPhone(branchId) {
+  const acc = await prisma.whatsAppAccount.findUnique({
+    where: { branchId },
+    select: { pairingMode: true, pairingPhone: true },
+  });
+  if (!acc?.pairingMode || !acc?.pairingPhone) return null;
+  return acc.pairingPhone;
+}
+
+/** Save the generated pairing code so the UI can display it. */
+export async function savePairingCode(branchId, code) {
+  await prisma.whatsAppAccount.updateMany({
+    where: { branchId },
+    data: { pairingCode: code, updatedAt: new Date() },
+  });
+}
+
+/** Clear pairing mode after successful connection or cancellation. */
+export async function clearPairingMode(branchId) {
+  await prisma.whatsAppAccount.updateMany({
+    where: { branchId },
+    data: { pairingPhone: null, pairingCode: null, pairingMode: false, updatedAt: new Date() },
+  });
+}
+
 // ── Session ───────────────────────────────────────────────────────────────────
 
 export async function getSession(branchId) {

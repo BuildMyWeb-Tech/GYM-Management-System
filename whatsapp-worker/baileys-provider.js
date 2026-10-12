@@ -42,17 +42,18 @@ export class BaileysProvider extends EventEmitter {
     this.authState = null;
   }
 
-  /** Connect (or reconnect) to WhatsApp Web. */
-  async connect() {
+  /**
+   * Connect (or reconnect) to WhatsApp Web.
+   * @param {string|null} pairingPhone - if set, use pairing-code auth instead of QR
+   */
+  async connect(pairingPhone = null) {
     if (this.sock) await this.disconnect();
     this.authState = await useDbAuthState(this.branchId);
-    this._wasAuthenticated = false; // track whether we reached 'open' this session
+    this._wasAuthenticated = false;
+    this._pairingPhone = pairingPhone;
 
-    // Pinned WA Web version — fetchLatestBaileysVersion() sometimes returns
-    // versions WhatsApp has revoked, causing "couldn't login" on QR scan.
-    // Update this when the pinned version stops working.
     const WA_VERSION = [2, 3000, 1019477817];
-    this.log.debug({ version: WA_VERSION }, 'Connecting with pinned WA version');
+    this.log.debug({ version: WA_VERSION, pairingMode: !!pairingPhone }, 'Connecting');
 
     this.sock = makeWASocket({
       version: WA_VERSION,
@@ -60,7 +61,6 @@ export class BaileysProvider extends EventEmitter {
         creds: this.authState.state.creds,
         keys: makeCacheableSignalKeyStore(this.authState.state.keys, noopLogger),
       },
-      // Realistic Chrome/Windows browser string — generic 'Desktop' triggers bot detection
       browser: ['Windows', 'Chrome', '121.0.6167.160'],
       printQRInTerminal: false,
       logger: noopLogger,
@@ -69,7 +69,24 @@ export class BaileysProvider extends EventEmitter {
       markOnlineOnConnect: false,
       connectTimeoutMs: 60_000,
       defaultQueryTimeoutMs: undefined,
+      // Use phone pairing instead of QR when a phone number is provided
+      ...(pairingPhone ? { usePairingCode: true } : {}),
     });
+
+    // Request pairing code right after socket is ready (only for new sessions)
+    if (pairingPhone && !this.authState.state.creds.registered) {
+      // Small delay to let the socket handshake complete before requesting
+      setTimeout(async () => {
+        try {
+          const code = await this.sock.requestPairingCode(pairingPhone);
+          this.log.info({ code }, 'Pairing code generated');
+          this.emit('pairing_code', { code });
+        } catch (err) {
+          this.log.error({ err }, 'requestPairingCode failed');
+          this.emit('pairing_code_error', { error: err.message });
+        }
+      }, 3000);
+    }
 
     this.sock.ev.on('creds.update', this.authState.saveCreds);
 
