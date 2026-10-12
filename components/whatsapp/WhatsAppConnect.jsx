@@ -6,7 +6,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { getBranchAuthHeader } from '@/lib/authHeader';
 import {
-  Smartphone, Wifi, WifiOff, QrCode, RefreshCw, AlertCircle, CheckCircle2, Hash, Phone,
+  Smartphone, Wifi, WifiOff, QrCode, AlertCircle, CheckCircle2, Hash, Phone, RotateCcw,
 } from 'lucide-react';
 
 const POLL_MS = 2500;
@@ -46,6 +46,7 @@ export default function WhatsAppConnect() {
   const [mode, setMode] = useState('qr'); // 'qr' | 'phone'
   const [phone, setPhone] = useState('');
   const [requestingCode, setRequestingCode] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const timerRef = useRef(null);
   const pendingTimeoutRef = useRef(null);
 
@@ -126,6 +127,22 @@ export default function WhatsAppConnect() {
       toast.error(e?.response?.data?.error || e.message);
     } finally {
       setRequestingCode(false);
+    }
+  };
+
+  const resetSession = async () => {
+    if (!confirm('Clear the stored WhatsApp session? The worker will need to re-authenticate via QR or phone number.')) return;
+    setResetting(true);
+    try {
+      const headers = await getBranchAuthHeader(getToken);
+      await axios.post('/api/whatsapp/reset', {}, { headers });
+      toast.success('Session cleared — click Connect to generate a fresh QR');
+      setMode('qr');
+      await fetchStatus();
+    } catch (e) {
+      toast.error(e?.response?.data?.error || e.message);
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -214,6 +231,17 @@ export default function WhatsAppConnect() {
             )}
           </div>
         </div>
+
+        {/* Reset Session — available when disconnected/errored */}
+        {!isConnected && (state === 'ERROR' || state === 'DISCONNECTED' || state === 'LOGGED_OUT' || state === 'QR_REQUIRED') && (
+          <div className="flex justify-end">
+            <button onClick={resetSession} disabled={resetting}
+              className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50">
+              {resetting ? <span className="w-3 h-3 border border-slate-300 border-t-red-400 rounded-full animate-spin" /> : <RotateCcw size={11} />}
+              Reset Session
+            </button>
+          </div>
+        )}
 
         {/* Method switcher — only show when disconnected */}
         {!isConnected && (

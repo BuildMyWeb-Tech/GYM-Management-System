@@ -5,7 +5,9 @@
 import { EventEmitter } from 'events';
 import makeWASocket, {
   DisconnectReason,
+  fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
+  Browsers,
   proto,
   WAMessageStatus,
 } from '@whiskeysockets/baileys';
@@ -52,16 +54,26 @@ export class BaileysProvider extends EventEmitter {
     this._wasAuthenticated = false;
     this._pairingPhone = pairingPhone;
 
-    const WA_VERSION = [2, 3000, 1019477817];
-    this.log.debug({ version: WA_VERSION, pairingMode: !!pairingPhone }, 'Connecting');
+    // Always fetch the live WA Web version — hardcoding causes "couldn't login"
+    // because WhatsApp rejects stale client versions.
+    let version;
+    try {
+      const result = await fetchLatestBaileysVersion();
+      version = result.version;
+      this.log.info({ version }, 'WA version fetched');
+    } catch (err) {
+      // Network unreachable from this IP — use known-good fallback
+      version = [2, 3000, 1019477817];
+      this.log.warn({ err: err.message, version }, 'fetchLatestBaileysVersion failed, using fallback');
+    }
 
     this.sock = makeWASocket({
-      version: WA_VERSION,
+      version,
       auth: {
         creds: this.authState.state.creds,
         keys: makeCacheableSignalKeyStore(this.authState.state.keys, noopLogger),
       },
-      browser: ['Windows', 'Chrome', '121.0.6167.160'],
+      browser: Browsers.macOS('Desktop'),
       printQRInTerminal: false,
       logger: noopLogger,
       getMessage: async () => undefined,
@@ -69,7 +81,6 @@ export class BaileysProvider extends EventEmitter {
       markOnlineOnConnect: false,
       connectTimeoutMs: 60_000,
       defaultQueryTimeoutMs: undefined,
-      // Use phone pairing instead of QR when a phone number is provided
       ...(pairingPhone ? { usePairingCode: true } : {}),
     });
 
