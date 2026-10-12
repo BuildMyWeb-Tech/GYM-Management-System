@@ -5,10 +5,8 @@
 import { EventEmitter } from 'events';
 import makeWASocket, {
   DisconnectReason,
-  fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
   proto,
-  Browsers,
   WAMessageStatus,
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
@@ -50,22 +48,27 @@ export class BaileysProvider extends EventEmitter {
     this.authState = await useDbAuthState(this.branchId);
     this._wasAuthenticated = false; // track whether we reached 'open' this session
 
-    const { version } = await fetchLatestBaileysVersion();
-    this.log.debug({ version }, 'Connecting with Baileys version');
+    // Pinned WA Web version — fetchLatestBaileysVersion() sometimes returns
+    // versions WhatsApp has revoked, causing "couldn't login" on QR scan.
+    // Update this when the pinned version stops working.
+    const WA_VERSION = [2, 3000, 1019477817];
+    this.log.debug({ version: WA_VERSION }, 'Connecting with pinned WA version');
 
     this.sock = makeWASocket({
-      version,
+      version: WA_VERSION,
       auth: {
         creds: this.authState.state.creds,
         keys: makeCacheableSignalKeyStore(this.authState.state.keys, noopLogger),
       },
-      // macOS Desktop is accepted by WhatsApp; ubuntu/Chrome is now blocked
-      browser: Browsers.macOS('Desktop'),
+      // Realistic Chrome/Windows browser string — generic 'Desktop' triggers bot detection
+      browser: ['Windows', 'Chrome', '121.0.6167.160'],
       printQRInTerminal: false,
       logger: noopLogger,
       getMessage: async () => undefined,
       syncFullHistory: false,
       markOnlineOnConnect: false,
+      connectTimeoutMs: 60_000,
+      defaultQueryTimeoutMs: undefined,
     });
 
     this.sock.ev.on('creds.update', this.authState.saveCreds);
